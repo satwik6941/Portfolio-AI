@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import json
 import atexit
+import time
 from datetime import datetime
 from dotenv import load_dotenv
 import pytesseract
@@ -92,17 +93,237 @@ def main():
 
 def data_input_page(data_extractor):
     st.header("📤 Data Input")
-    st.markdown("Complete your profile by answering quick questions and then verifying with your resume or LinkedIn.")
+    st.markdown("Upload your resume to automatically extract and edit your profile information.")
     
-    if "qa_completed" not in st.session_state:
-        st.session_state.qa_completed = False
+    if "extracted_data" not in st.session_state:
+        st.session_state.extracted_data = {}
     if "verification_completed" not in st.session_state:
         st.session_state.verification_completed = False
     
-    if not st.session_state.qa_completed:
-        st.subheader("Step 1: Basic Information")
+    # Resume Upload Section
+    st.subheader("📄 Upload Your Resume")
+    uploaded_file = st.file_uploader(
+        "Upload your CV/Resume for automatic data extraction", 
+        type=["pdf", "docx", "jpg", "jpeg", "png"],
+        help="Upload your resume and we'll automatically extract your information"
+    )
+    
+    if uploaded_file and not st.session_state.verification_completed:
+        with st.spinner("🤖 Extracting and analyzing your resume..."):
+            # Extract text from file
+            extracted_text = data_extractor.extract_from_file(uploaded_file)
+            
+            if extracted_text:
+                # Parse the extracted text using AI to get structured data
+                groq_service = initialize_services()[0]
+                if groq_service:
+                    parsed_data = groq_service.parse_resume_data(extracted_text)
+                    st.session_state.extracted_data = parsed_data
+                    st.session_state.user_data.update(parsed_data)
+                    st.session_state.verification_completed = True
+                    st.success("✅ Resume processed successfully!")
+                    st.rerun()
+                else:
+                    st.error("Failed to initialize AI service")
+            else:
+                st.error("Failed to extract text from file")
+    
+    # Display and Edit Extracted Information
+    if st.session_state.verification_completed and st.session_state.extracted_data:
+        st.subheader("✏️ Review and Edit Your Information")
+        st.info("Review the automatically extracted information and edit as needed:")
         
-        with st.form("qa_form"):
+        # Create editable fields for each piece of data
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Name field with edit button
+            name_col1, name_col2 = st.columns([3, 1])
+            with name_col1:
+                current_name = st.session_state.user_data.get('name', 'Not found')
+                st.text_input("Full Name", value=current_name, key="edit_name", disabled=True)
+            with name_col2:
+                if st.button("✏️", key="edit_name_btn", help="Edit Name"):
+                    st.session_state.editing_name = True
+            
+            if st.session_state.get('editing_name', False):
+                new_name = st.text_input("Enter new name:", value=current_name, key="new_name")
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("💾 Save", key="save_name"):
+                        st.session_state.user_data['name'] = new_name
+                        st.session_state.editing_name = False
+                        st.rerun()
+                with col_cancel:
+                    if st.button("❌ Cancel", key="cancel_name"):
+                        st.session_state.editing_name = False
+                        st.rerun()
+            
+            # Email field with edit button
+            email_col1, email_col2 = st.columns([3, 1])
+            with email_col1:
+                current_email = st.session_state.user_data.get('email', 'Not found')
+                st.text_input("Email", value=current_email, key="edit_email", disabled=True)
+            with email_col2:
+                if st.button("✏️", key="edit_email_btn", help="Edit Email"):
+                    st.session_state.editing_email = True
+            
+            if st.session_state.get('editing_email', False):
+                new_email = st.text_input("Enter new email:", value=current_email, key="new_email")
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("💾 Save", key="save_email"):
+                        st.session_state.user_data['email'] = new_email
+                        st.session_state.editing_email = False
+                        st.rerun()
+                with col_cancel:
+                    if st.button("❌ Cancel", key="cancel_email"):
+                        st.session_state.editing_email = False
+                        st.rerun()
+            
+            # Phone field with edit button
+            phone_col1, phone_col2 = st.columns([3, 1])
+            with phone_col1:
+                current_phone = st.session_state.user_data.get('phone', 'Not found')
+                st.text_input("Phone", value=current_phone, key="edit_phone", disabled=True)
+            with phone_col2:
+                if st.button("✏️", key="edit_phone_btn", help="Edit Phone"):
+                    st.session_state.editing_phone = True
+            
+            if st.session_state.get('editing_phone', False):
+                new_phone = st.text_input("Enter new phone:", value=current_phone, key="new_phone")
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("💾 Save", key="save_phone"):
+                        st.session_state.user_data['phone'] = new_phone
+                        st.session_state.editing_phone = False
+                        st.rerun()
+                with col_cancel:
+                    if st.button("❌ Cancel", key="cancel_phone"):
+                        st.session_state.editing_phone = False
+                        st.rerun()
+        
+        with col2:
+            # Title field with edit button
+            title_col1, title_col2 = st.columns([3, 1])
+            with title_col1:
+                current_title = st.session_state.user_data.get('title', 'Not found')
+                st.text_input("Job Title", value=current_title, key="edit_title", disabled=True)
+            with title_col2:
+                if st.button("✏️", key="edit_title_btn", help="Edit Title"):
+                    st.session_state.editing_title = True
+            
+            if st.session_state.get('editing_title', False):
+                new_title = st.text_input("Enter new title:", value=current_title, key="new_title")
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("💾 Save", key="save_title"):
+                        st.session_state.user_data['title'] = new_title
+                        st.session_state.editing_title = False
+                        st.rerun()
+                with col_cancel:
+                    if st.button("❌ Cancel", key="cancel_title"):
+                        st.session_state.editing_title = False
+                        st.rerun()
+            
+            # Education field with edit button
+            education_col1, education_col2 = st.columns([3, 1])
+            with education_col1:
+                current_education = st.session_state.user_data.get('education', 'Not found')
+                st.text_area("Education", value=current_education, key="edit_education", disabled=True, height=100)
+            with education_col2:
+                if st.button("✏️", key="edit_education_btn", help="Edit Education"):
+                    st.session_state.editing_education = True
+            
+            if st.session_state.get('editing_education', False):
+                new_education = st.text_area("Enter new education:", value=current_education, key="new_education", height=100)
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("💾 Save", key="save_education"):
+                        st.session_state.user_data['education'] = new_education
+                        st.session_state.editing_education = False
+                        st.rerun()
+                with col_cancel:
+                    if st.button("❌ Cancel", key="cancel_education"):
+                        st.session_state.editing_education = False
+                        st.rerun()
+        
+        # Skills section with edit capability
+        st.subheader("🛠️ Skills")
+        skills_col1, skills_col2 = st.columns([3, 1])
+        with skills_col1:
+            current_skills = st.session_state.user_data.get('skills', [])
+            skills_str = ', '.join(current_skills) if isinstance(current_skills, list) else str(current_skills)
+            st.text_area("Skills", value=skills_str, key="edit_skills", disabled=True, height=80)
+        with skills_col2:
+            if st.button("✏️", key="edit_skills_btn", help="Edit Skills"):
+                st.session_state.editing_skills = True
+        
+        if st.session_state.get('editing_skills', False):
+            new_skills = st.text_area("Enter skills (comma-separated):", value=skills_str, key="new_skills", height=80)
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.button("💾 Save", key="save_skills"):
+                    skills_list = [skill.strip() for skill in new_skills.split(',') if skill.strip()]
+                    st.session_state.user_data['skills'] = skills_list
+                    st.session_state.editing_skills = False
+                    st.rerun()
+            with col_cancel:
+                if st.button("❌ Cancel", key="cancel_skills"):
+                    st.session_state.editing_skills = False
+                    st.rerun()
+        
+        # Experience section with edit capability
+        st.subheader("💼 Work Experience")
+        exp_col1, exp_col2 = st.columns([3, 1])
+        with exp_col1:
+            current_experience = st.session_state.user_data.get('experience', 'Not found')
+            st.text_area("Experience", value=current_experience, key="edit_experience", disabled=True, height=120)
+        with exp_col2:
+            if st.button("✏️", key="edit_experience_btn", help="Edit Experience"):
+                st.session_state.editing_experience = True
+        
+        if st.session_state.get('editing_experience', False):
+            new_experience = st.text_area("Enter your experience:", value=current_experience, key="new_experience", height=120)
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.button("💾 Save", key="save_experience"):
+                    st.session_state.user_data['experience'] = new_experience
+                    st.session_state.editing_experience = False
+                    st.rerun()
+            with col_cancel:
+                if st.button("❌ Cancel", key="cancel_experience"):
+                    st.session_state.editing_experience = False
+                    st.rerun()
+        
+        # Summary section
+        st.subheader("📋 Profile Summary")
+        summary_data = {
+            'Name': st.session_state.user_data.get('name', 'N/A'),
+            'Email': st.session_state.user_data.get('email', 'N/A'), 
+            'Phone': st.session_state.user_data.get('phone', 'N/A'),
+            'Title': st.session_state.user_data.get('title', 'N/A'),
+            'Skills Count': len(st.session_state.user_data.get('skills', [])),
+            'Verification': 'Resume Upload ✅'
+        }
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Fields Completed", len([v for v in summary_data.values() if v != 'N/A']), "out of 6")
+        with col2:
+            st.metric("Skills Extracted", summary_data['Skills Count'])
+        with col3:
+            if st.button("🔄 Re-upload Resume"):
+                st.session_state.verification_completed = False
+                st.session_state.extracted_data = {}
+                st.rerun()
+    
+    elif not uploaded_file:
+        # Manual input option if no file uploaded
+        st.subheader("✏️ Manual Information Entry")
+        st.info("💡 Upload a resume above for automatic extraction, or fill in manually below:")
+        
+        with st.form("manual_form"):
             name = st.text_input("Full Name:")
             email = st.text_input("Email:")
             phone = st.text_input("Phone:")
@@ -123,11 +344,11 @@ def data_input_page(data_extractor):
                         'experience': experience,
                         'skills': skills.split(',') if skills else [],
                         'education': education,
-                        'source': 'qa'
+                        'source': 'manual'
                     }
                     st.session_state.user_data.update(qa_data)
-                    st.session_state.qa_completed = True
-                    st.success("✅ Basic information saved!")
+                    st.session_state.verification_completed = True
+                    st.success("✅ Information saved!")
                     st.rerun()
                 else:
                     st.error("Please fill in at least Name, Email, and Job Title")
@@ -1179,21 +1400,427 @@ def interview_page(interview_sim):
         st.session_state.interview_active = False
     if 'interview_session' not in st.session_state:
         st.session_state.interview_session = None
-        
-    # Create InterviewUI instance
-    from interview_simulator import InterviewUI
-    interview_ui = InterviewUI(interview_sim)
+    if 'interview_messages' not in st.session_state:
+        st.session_state.interview_messages = []
     
     # Render appropriate UI based on interview state
     if not st.session_state.interview_active:
-        interview_ui.render_interview_setup()
+        render_interview_setup(interview_sim)
     else:
         if st.session_state.interview_session:
             current_q = interview_sim.get_current_question(st.session_state.interview_session)
             if current_q:
-                interview_ui.render_active_interview()
+                render_active_interview(interview_sim)
             else:
-                interview_ui.render_interview_results()
+                render_interview_results(interview_sim)
+
+def render_interview_setup(interview_sim):
+    """Render the interview setup page"""
+    st.subheader("🎯 Interview Setup")
+    st.markdown("Configure your AI interview session:")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        job_title = st.text_input("🎯 Job Title", 
+                                placeholder="e.g., Software Engineer, Data Scientist", 
+                                help="The position you're interviewing for")
+        company = st.text_input("🏢 Company Name", 
+                               placeholder="e.g., Google, Microsoft, Amazon",
+                               help="Target company (optional)")
+        
+    with col2:
+        experience_level = st.selectbox("📊 Experience Level", [
+            "Entry Level (0-2 years)",
+            "Mid Level (3-5 years)", 
+            "Senior Level (6-10 years)",
+            "Executive (10+ years)"
+        ])
+        
+        interview_type = st.selectbox("🎭 Interview Type", [
+            "General/Behavioral",
+            "Technical/Skills-based",
+            "Case Study/Problem Solving",
+            "Leadership/Management",
+            "Mixed (All types)"
+        ])
+    
+    # Optional job description
+    job_description = st.text_area(
+        "📋 Job Description (Optional but Recommended)",
+        height=120,
+        placeholder="Paste the job description here for more targeted interview questions...",
+        help="AI will generate questions specifically tailored to this role"
+    )
+    
+    # Interview settings
+    st.subheader("⚙️ Interview Settings")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        num_questions = st.selectbox("Number of Questions", [3, 5, 8, 10], index=1)
+    with col2:
+        difficulty = st.selectbox("Difficulty Level", ["Easy", "Medium", "Hard", "Mixed"])
+    with col3:
+        time_limit = st.selectbox("Time per Question", ["No Limit", "2 minutes", "3 minutes", "5 minutes"])
+    
+    # Preview what to expect
+    with st.expander("📖 What to Expect in This Interview"):
+        st.markdown(f"""
+        **Interview Type:** {interview_type}
+        **Number of Questions:** {num_questions}
+        **Difficulty:** {difficulty}
+        **Time per Question:** {time_limit}
+        
+        **You'll receive:**
+        - Real-time AI feedback on each answer
+        - Scoring based on relevance, clarity, and depth
+        - Suggestions for improvement
+        - Final performance report with detailed analysis
+        
+        **Tips for Success:**
+        - Speak clearly and provide specific examples
+        - Use the STAR method (Situation, Task, Action, Result)
+        - Take your time to think before answering
+        - Be authentic and honest in your responses
+        """)
+    
+    # Start interview button
+    if st.button("🚀 Start AI Interview", type="primary", use_container_width=True):
+        if not job_title.strip():
+            st.error("⚠️ Please provide a job title to start the interview.")
+            return
+        
+        # Prepare job description
+        if not job_description.strip():
+            job_description = f"""
+            {interview_type} interview for {job_title} position at {company if company else 'a leading company'}.
+            Experience level: {experience_level}
+            
+            Key areas to assess:
+            - Relevant technical and soft skills
+            - Problem-solving abilities
+            - Communication and teamwork
+            - Cultural fit and motivation
+            - Experience and achievements
+            """
+        
+        # Get user background
+        user_background = st.session_state.get('user_data', {})
+        user_background.update({
+            'target_job_title': job_title,
+            'target_company': company,
+            'experience_level': experience_level,
+            'interview_type': interview_type,
+            'difficulty': difficulty,
+            'num_questions': num_questions
+        })
+        
+        # Start interview session
+        with st.spinner("🤖 AI is preparing your personalized interview questions..."):
+            session = interview_sim.start_interview_session(job_description, user_background)
+            
+            if session and session.get('questions'):
+                st.session_state.interview_session = session
+                st.session_state.interview_active = True
+                st.session_state.interview_messages = []
+                st.success("✅ Interview session created! Starting now...")
+                st.rerun()
+            else:
+                st.error("❌ Failed to create interview session. Please try again.")
+
+def render_active_interview(interview_sim):
+    """Render the active interview interface"""
+    session = st.session_state.interview_session
+    current_q_index = session['current_question']
+    total_questions = len(session['questions'])
+    current_q = interview_sim.get_current_question(session)
+    
+    if not current_q:
+        render_interview_results(interview_sim)
+        return
+    
+    # Progress indicator
+    progress = current_q_index / total_questions
+    st.progress(progress, text=f"Question {current_q_index + 1} of {total_questions}")
+    
+    # Question display
+    st.subheader(f"Question {current_q_index + 1}")
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        st.write(f"**Type:** {current_q.get('type', 'General')}")
+    with col2:
+        st.write(f"**Difficulty:** {current_q.get('difficulty', 'Medium')}")
+    with col3:
+        st.write(f"**Focus:** {current_q.get('category', 'General Skills')}")
+    
+    # Display the question
+    st.markdown(f"### 💬 {current_q['question']}")
+    
+    # Helpful context if available
+    if current_q.get('context'):
+        st.info(f"💡 **Context:** {current_q['context']}")
+    
+    # Answer input
+    st.markdown("### ✍️ Your Answer")
+    answer = st.text_area(
+        "Type your response here:",
+        height=200,
+        placeholder="Take your time to provide a thoughtful, detailed answer. Use specific examples when possible...",
+        key=f"answer_{current_q_index}",
+        help="Tip: Use the STAR method (Situation, Task, Action, Result) for behavioral questions"
+    )
+    
+    # Answer character count
+    if answer:
+        char_count = len(answer)
+        if char_count < 50:
+            st.warning(f"📝 {char_count} characters - Consider providing more detail")
+        elif char_count < 200:
+            st.info(f"📝 {char_count} characters - Good length, add more specifics if possible")
+        else:
+            st.success(f"📝 {char_count} characters - Great detailed response!")
+    
+    # Action buttons
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    
+    with col1:
+        submit_disabled = not answer.strip() or len(answer.strip()) < 10
+        if st.button("✅ Submit Answer", type="primary", disabled=submit_disabled, use_container_width=True):
+            with st.spinner("🤖 AI is evaluating your answer..."):
+                evaluation = interview_sim.submit_answer(session, answer)
+                if evaluation:
+                    st.session_state.last_evaluation = evaluation
+                    st.rerun()
+    
+    with col2:
+        if st.button("⏭️ Skip", use_container_width=True):
+            interview_sim.submit_answer(session, "Question skipped by candidate")
+            st.rerun()
+    
+    with col3:
+        if st.button("🔄 Regenerate Q", use_container_width=True, help="Get a different question"):
+            # Generate a new question for current position
+            user_data = st.session_state.get('user_data', {})
+            job_desc = session.get('job_description', '')
+            groq_service = initialize_services()[0]
+            if groq_service:
+                new_question = groq_service.generate_interview_question(user_data, job_desc)
+                if new_question:
+                    session['questions'][current_q_index] = {
+                        'question': new_question,
+                        'type': current_q.get('type', 'General'),
+                        'difficulty': current_q.get('difficulty', 'Medium'),
+                        'category': current_q.get('category', 'General')
+                    }
+                    st.rerun()
+    
+    with col4:
+        if st.button("🛑 End Interview", use_container_width=True):
+            st.session_state.interview_active = False
+            st.rerun()
+    
+    # Show feedback from previous question
+    if hasattr(st.session_state, 'last_evaluation') and st.session_state.last_evaluation:
+        render_question_feedback(st.session_state.last_evaluation)
+
+def render_question_feedback(evaluation):
+    """Render feedback for the previous question"""
+    st.divider()
+    st.subheader("📊 Feedback on Previous Answer")
+    
+    score = evaluation.get('score', 5)
+    
+    # Score display with color coding
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if score >= 8:
+            st.success(f"🎉 Score: {score}/10 - Excellent Response!")
+        elif score >= 6:
+            st.info(f"👍 Score: {score}/10 - Good Answer")
+        elif score >= 4:
+            st.warning(f"⚠️ Score: {score}/10 - Fair Response")
+        else:
+            st.error(f"❌ Score: {score}/10 - Needs Improvement")
+    
+    # Detailed feedback
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if evaluation.get('strengths'):
+            st.markdown("**✅ What You Did Well:**")
+            for strength in evaluation['strengths']:
+                st.write(f"• {strength}")
+    
+    with col2:
+        if evaluation.get('weaknesses'):
+            st.markdown("**📈 Areas for Improvement:**")
+            for weakness in evaluation['weaknesses']:
+                st.write(f"• {weakness}")
+    
+    # Overall feedback
+    if evaluation.get('feedback'):
+        st.markdown("**💭 AI Interviewer Feedback:**")
+        st.info(evaluation['feedback'])
+    
+    # Suggestions for improvement
+    if evaluation.get('suggestions'):
+        st.markdown("**💡 Suggestions for Next Time:**")
+        st.write(evaluation['suggestions'])
+
+def render_interview_results(interview_sim):
+    """Render the final interview results"""
+    session = st.session_state.interview_session
+    report = interview_sim.get_final_report(session)
+    
+    # Success animation
+    st.balloons()
+    st.subheader("🎉 Interview Complete!")
+    
+    # Overall score with visual feedback
+    score = report['overall_score']
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        if score >= 8:
+            st.success(f"🌟 Overall Score: {score}/10")
+            st.success(f"Performance: {report['performance_level']}")
+        elif score >= 6:
+            st.info(f"👍 Overall Score: {score}/10")
+            st.info(f"Performance: {report['performance_level']}")
+        elif score >= 4:
+            st.warning(f"⚠️ Overall Score: {score}/10")
+            st.warning(f"Performance: {report['performance_level']}")
+        else:
+            st.error(f"❌ Overall Score: {score}/10")
+            st.error(f"Performance: {report['performance_level']}")
+    
+    # Performance message
+    st.markdown(f"### 💬 {report['message']}")
+    
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Questions Answered", report['questions_answered'])
+    with col2:
+        st.metric("Duration", f"{report['duration_minutes']} min")
+    with col3:
+        st.metric("Average Score", f"{score}/10")
+    with col4:
+        completion_rate = (report['questions_answered'] / len(session['questions'])) * 100
+        st.metric("Completion Rate", f"{completion_rate:.0f}%")
+    
+    # Detailed breakdown
+    if st.checkbox("📊 Show Detailed Question Breakdown", value=True):
+        for i, feedback in enumerate(report['detailed_feedback']):
+            if i < len(session['answers']):  # Make sure we have an answer
+                with st.expander(f"Question {i + 1} - Score: {feedback.get('score', 'N/A')}/10"):
+                    question = session['questions'][i]['question']
+                    answer = session['answers'][i]
+                    
+                    st.markdown(f"**❓ Question:** {question}")
+                    st.markdown(f"**💬 Your Answer:** {answer}")
+                    
+                    if feedback.get('feedback'):
+                        st.markdown(f"**🤖 AI Feedback:** {feedback['feedback']}")
+                    
+                    if feedback.get('strengths'):
+                        st.markdown("**✅ Strengths:**")
+                        for strength in feedback['strengths']:
+                            st.write(f"• {strength}")
+                    
+                    if feedback.get('weaknesses'):
+                        st.markdown("**📈 Improvement Areas:**")
+                        for weakness in feedback['weaknesses']:
+                            st.write(f"• {weakness}")
+    
+    # Action buttons
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🔄 Practice Again", type="primary", use_container_width=True):
+            # Reset interview state
+            for key in ['interview_session', 'interview_active', 'last_evaluation']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    
+    with col2:
+        if st.button("📊 Download Report", use_container_width=True):
+            report_text = generate_report_text(report, session)
+            st.download_button(
+                label="📄 Download Detailed Report",
+                data=report_text,
+                file_name=f"interview_report_{int(time.time())}.txt",
+                mime="text/plain"
+            )
+    
+    with col3:
+        if st.button("🎯 Practice Specific Areas", use_container_width=True):
+            st.info("💡 Navigate back to the setup to practice specific interview types or difficulties!")
+
+def generate_report_text(report, session):
+    """Generate a text report for download"""
+    import time
+    
+    lines = [
+        "AI INTERVIEW PERFORMANCE REPORT",
+        "=" * 50,
+        f"Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "OVERALL PERFORMANCE:",
+        f"• Overall Score: {report['overall_score']}/10",
+        f"• Performance Level: {report['performance_level']}", 
+        f"• Questions Answered: {report['questions_answered']}",
+        f"• Interview Duration: {report['duration_minutes']} minutes",
+        "",
+        "EXECUTIVE SUMMARY:",
+        report['message'],
+        "",
+        "DETAILED QUESTION BREAKDOWN:",
+        "-" * 40
+    ]
+    
+    for i, feedback in enumerate(report['detailed_feedback']):
+        if i < len(session['answers']):
+            lines.extend([
+                f"",
+                f"QUESTION {i + 1}:",
+                f"Q: {session['questions'][i]['question']}",
+                f"A: {session['answers'][i]}",
+                f"Score: {feedback.get('score', 'N/A')}/10",
+                f"Feedback: {feedback.get('feedback', 'No feedback available')}",
+                "-" * 40
+            ])
+    
+    if report.get('improvement_areas'):
+        lines.extend([
+            "",
+            "KEY IMPROVEMENT AREAS:",
+            *[f"• {area}" for area in report['improvement_areas']]
+        ])
+    
+    if report.get('strengths'):
+        lines.extend([
+            "",
+            "DEMONSTRATED STRENGTHS:",
+            *[f"• {strength}" for strength in report['strengths']]
+        ])
+    
+    lines.extend([
+        "",
+        "RECOMMENDATIONS:",
+        "• Continue practicing with different interview types",
+        "• Focus on providing specific examples using the STAR method",
+        "• Practice articulating achievements with quantifiable results",
+        "• Research target companies and roles thoroughly",
+        "",
+        "Good luck with your interviews!"
+    ])
+    
+    return "\n".join(lines)
 
 if __name__ == "__main__":
     main()

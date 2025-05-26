@@ -1414,3 +1414,128 @@ class GroqLLM:
                 "weaknesses": ["Limited leadership experience"],
                 "recommended_next_steps": "Proceed to final interview"
             }
+    
+    def parse_resume_data(self, resume_text: str) -> Dict[str, Any]:
+        """
+        Parse resume text using AI to extract structured data
+        """
+        prompt = f"""
+        Parse the following resume text and extract key information into a structured format.
+        Focus on accuracy and completeness.
+        
+        Resume Text:
+        {resume_text}
+        
+        Extract and return the following information as JSON:
+        {{
+            "name": "Full name of the person",
+            "email": "Email address",
+            "phone": "Phone number",
+            "title": "Current or most recent job title/position",
+            "skills": ["list", "of", "technical", "and", "soft", "skills"],
+            "experience": "Brief summary of work experience",
+            "education": "Educational background",
+            "projects": ["list", "of", "notable", "projects"],
+            "certifications": ["list", "of", "certifications"],
+            "location": "Current location/address"
+        }}
+        
+        Return only valid JSON. If information is not found, use empty string or empty array.
+        """
+        
+        messages = [
+            {
+                "role": "system", 
+                "content": "You are an expert resume parser. Extract information accurately and return only valid JSON."
+            },
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = self._make_request(messages, max_tokens=1000, temperature=0.3)
+        
+        try:
+            # Extract JSON from response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start != -1 and json_end != 0:
+                json_str = response[json_start:json_end]
+                parsed_data = json.loads(json_str)
+                
+                # Ensure required fields exist
+                required_fields = ['name', 'email', 'phone', 'title', 'skills', 'experience', 'education']
+                for field in required_fields:
+                    if field not in parsed_data:
+                        parsed_data[field] = '' if field != 'skills' else []
+                
+                return parsed_data
+        except Exception as e:
+            # Fallback parsing if AI fails
+            return self._fallback_resume_parsing(resume_text)
+    
+    def _fallback_resume_parsing(self, text: str) -> Dict[str, Any]:
+        """
+        Fallback method for basic resume parsing using regex patterns
+        """
+        import re
+        
+        data = {
+            'name': '',
+            'email': '',
+            'phone': '',
+            'title': '',
+            'skills': [],
+            'experience': '',
+            'education': '',
+            'projects': [],
+            'certifications': [],
+            'location': ''
+        }
+        
+        # Extract email
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, text)
+        if emails:
+            data['email'] = emails[0]
+        
+        # Extract phone
+        phone_pattern = r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'
+        phones = re.findall(phone_pattern, text)
+        if phones:
+            data['phone'] = ''.join(phones[0]) if isinstance(phones[0], tuple) else phones[0]
+        
+        # Extract name (usually in first few lines)
+        lines = text.split('\n')
+        for line in lines[:5]:
+            line = line.strip()
+            if line and not any(char.isdigit() for char in line) and '@' not in line:
+                if len(line.split()) <= 4 and len(line) > 2:
+                    data['name'] = line
+                    break
+        
+        # Extract common skills
+        skill_keywords = [
+            'Python', 'JavaScript', 'Java', 'C++', 'React', 'Node.js', 'SQL',
+            'Machine Learning', 'Data Analysis', 'Project Management', 'Leadership',
+            'Communication', 'Problem Solving', 'Teamwork', 'Git', 'AWS', 'Docker'
+        ]
+        
+        found_skills = []
+        text_lower = text.lower()
+        for skill in skill_keywords:
+            if skill.lower() in text_lower:
+                found_skills.append(skill)
+        data['skills'] = found_skills
+        
+        # Basic experience extraction (get text around "experience" keyword)
+        exp_pattern = r'(?i)(experience|work history|employment)(.*?)(?=education|skills|projects|$)'
+        exp_match = re.search(exp_pattern, text, re.DOTALL)
+        if exp_match:
+            data['experience'] = exp_match.group(2).strip()[:500]  # Limit length
+        
+        # Basic education extraction
+        edu_pattern = r'(?i)(education|academic|degree)(.*?)(?=experience|skills|projects|$)'
+        edu_match = re.search(edu_pattern, text, re.DOTALL)
+        if edu_match:
+            data['education'] = edu_match.group(2).strip()[:300]  # Limit length
+        
+        return data
