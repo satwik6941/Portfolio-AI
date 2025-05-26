@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 import pytesseract
 from groq_service import GroqLLM
 from data_extractor import DataExtractor, JobSearcher
-from generators import PortfolioGenerator, ResumeGenerator, CoverLetterGenerator
+from generators_combined import PortfolioGenerator, ResumeGenerator, CoverLetterGenerator
 from interview_simulator import InterviewSimulator, InterviewUI
+from linkedin_service import LinkedInJobAPI
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -22,7 +23,6 @@ st.set_page_config(
 )
 
 def clear_session_data():
-    """Clear all session data"""
     if hasattr(st.session_state, 'user_data'):
         st.session_state.user_data = {}
     if hasattr(st.session_state, 'qa_completed'):
@@ -258,8 +258,7 @@ def portfolio_page(groq_service, portfolio_gen):
             with st.expander("📋 View Generated Content", expanded=False):
                 st.json(portfolio_content)
             
-            try:
-                # Map AI-generated content to template format
+            try:                # Map AI-generated content to template format
                 template_data = {
                     'name': st.session_state.user_data.get('name', 'Professional'),
                     'headline': portfolio_content.get('headline', portfolio_content.get('summary', 'Professional')),
@@ -268,7 +267,9 @@ def portfolio_page(groq_service, portfolio_gen):
                     'experience': [],
                     'email': st.session_state.user_data.get('email', 'contact@example.com'),
                     'phone': st.session_state.user_data.get('phone', 'Phone Number'),
-                    'linkedin': st.session_state.user_data.get('linkedin', 'linkedin.com/in/professional')
+                    'linkedin': st.session_state.user_data.get('linkedin', 'linkedin.com/in/professional'),
+                    'portfolio_style': portfolio_style,
+                    'color_scheme': color_scheme
                 }
                 
                 # Handle skills - extract from skills_categories or use user skills
@@ -295,9 +296,9 @@ def portfolio_page(groq_service, portfolio_gen):
                 else:
                     # Create experience from user data
                     template_data['experience'] = [{
-                        'title': st.session_state.user_data.get('title', 'Professional'),
-                        'company': 'Professional Experience',
-                        'duration': 'Current',                        'description': st.session_state.user_data.get('experience', 'Professional experience in the field')
+                        'title': st.session_state.user_data.get('title', 'Professional'),                        'company': 'Professional Experience',
+                        'duration': 'Current',
+                        'description': st.session_state.user_data.get('experience', 'Professional experience in the field')
                     }]
                 
                 html_content = portfolio_gen.generate_html(template_data)
@@ -322,8 +323,7 @@ def portfolio_page(groq_service, portfolio_gen):
                     if st.button("✨ Enhance with AI", use_container_width=True):
                         with st.spinner("🤖 AI is enhancing your portfolio..."):
                             enhanced_content = groq_service.enhance_portfolio_content(portfolio_content, st.session_state.user_data)
-                            if enhanced_content:
-                                # Map enhanced content to template format
+                            if enhanced_content:                                # Map enhanced content to template format
                                 enhanced_template_data = {
                                     'name': st.session_state.user_data.get('name', 'Professional'),
                                     'headline': enhanced_content.get('headline', enhanced_content.get('summary', 'Professional')),
@@ -332,7 +332,9 @@ def portfolio_page(groq_service, portfolio_gen):
                                     'experience': [],
                                     'email': st.session_state.user_data.get('email', 'contact@example.com'),
                                     'phone': st.session_state.user_data.get('phone', 'Phone Number'),
-                                    'linkedin': st.session_state.user_data.get('linkedin', 'linkedin.com/in/professional')
+                                    'linkedin': st.session_state.user_data.get('linkedin', 'linkedin.com/in/professional'),
+                                    'portfolio_style': portfolio_style,
+                                    'color_scheme': color_scheme
                                 }
                                 
                                 # Handle skills
@@ -381,7 +383,8 @@ def portfolio_page(groq_service, portfolio_gen):
                     "GitHub Pages (Recommended)": "https://pages.github.com/",
                     "Netlify (Easy Deploy)": "https://www.netlify.com/",
                     "Vercel (Developer Friendly)": "https://vercel.com/",
-                    "Custom Domain Setup": "https://domains.google.com/"                }
+                    "Custom Domain Setup": "https://domains.google.com/"
+                }
                 
                 deployment_tips = groq_service.generate_deployment_guide(hosting_option, st.session_state.user_data)
                 
@@ -400,33 +403,36 @@ def portfolio_page(groq_service, portfolio_gen):
                         st.success(f"✅ Ready to deploy to {hosting_option}!")
                 
                 with col2:
-                    if st.button(f"🌐 Go to {hosting_option.split(' ')[0]}", use_container_width=True):
-                        # Get the appropriate URL for the selected platform
-                        redirect_url = deployment_urls.get(hosting_option, "https://github.com/")
-                        
-                        # Display success message and provide link
-                        st.success(f"🚀 Redirecting to {hosting_option}...")
-                        st.markdown(f"**Click here to access {hosting_option}:**")
-                        st.markdown(f"🔗 [{hosting_option}]({redirect_url})")
-                        
-                        # Additional helpful information
-                        if "GitHub" in hosting_option:
-                            st.info("💡 **Tip:** Create a new repository and upload your HTML file to get started!")
-                        elif "Netlify" in hosting_option:
-                            st.info("💡 **Tip:** Drag and drop your HTML file directly to deploy instantly!")
-                        elif "Vercel" in hosting_option:
-                            st.info("💡 **Tip:** Connect your GitHub repository for automatic deployments!")
-                        else:
-                            st.info("💡 **Tip:** Purchase a custom domain and point it to your hosting service!")
-                        
-                        # JavaScript for auto-redirect (optional)
-                        st.markdown(f"""
-                        <script>
-                            setTimeout(function() {{
-                                window.open('{redirect_url}', '_blank');
-                            }}, 2000);
-                        </script>
-                        """, unsafe_allow_html=True)
+                    deployment_url = deployment_urls.get(hosting_option, "https://github.com/")
+                    
+                    # Create clickable deployment button with proper target="_blank"
+                    st.markdown(f"""
+                    <a href="{deployment_url}" target="_blank" style="
+                        display: inline-block;
+                        width: 100%;
+                        padding: 0.5rem 1rem;
+                        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 5px;
+                        text-align: center;
+                        font-weight: 600;
+                        margin-bottom: 1rem;
+                        transition: transform 0.2s ease;
+                    " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                        🌐 Go to {hosting_option.split(' ')[0]}
+                    </a>
+                    """, unsafe_allow_html=True)
+                    
+                    # Display helpful information below the button
+                    if "GitHub" in hosting_option:
+                        st.info("💡 **Tip:** Create a new repository and upload your HTML file to get started!")
+                    elif "Netlify" in hosting_option:
+                        st.info("💡 **Tip:** Drag and drop your HTML file directly to deploy instantly!")
+                    elif "Vercel" in hosting_option:
+                        st.info("💡 **Tip:** Connect your GitHub repository for automatic deployments!")
+                    else:
+                        st.info("💡 **Tip:** Purchase a custom domain and point it to your hosting service!")
                     
             except Exception as e:
                 st.error(f"❌ Error generating portfolio: {str(e)}")
@@ -445,12 +451,20 @@ def resume_page(groq_service, resume_gen):
     st.markdown("### 🤖 AI-Powered ATS-Optimized Resume")
     st.info("Our AI will create a professionally tailored resume optimized for Applicant Tracking Systems (ATS).")
     
+    # Simple text box for skills input
+    user_skills = st.text_area(
+        "💼 Enter Your Skills and Experience:",
+        height=150,
+        placeholder="Enter your technical skills, soft skills, certifications, and key experiences here. Separate with commas or line breaks.\n\nExample:\nPython, JavaScript, React, Node.js\nProject Management, Team Leadership\nAWS, Docker, Kubernetes\n5 years software development experience",
+        help="List all your relevant skills, technologies, certifications, and experience. The AI will use this to generate your resume."
+    )
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
         job_description = st.text_area(
             "🎯 Target Job Description (Optional - for AI tailoring):",
-            height=150,
+            height=120,
             placeholder="Paste the job description here for AI to tailor your resume specifically for this role...",
             help="AI will analyze the job requirements and optimize your resume accordingly"
         )
@@ -462,33 +476,43 @@ def resume_page(groq_service, resume_gen):
             "Technical Specialist",
             "Entry Level Focus"
         ])
-        
-        ai_enhancements = st.multiselect("AI Enhancements:", [
-            "Quantify achievements with AI-generated metrics",
-            "Add industry-specific keywords",
-            "Optimize for ATS scanning",
-            "Include trending skills",
-            "Generate achievement statements"
-        ], default=["Optimize for ATS scanning", "Add industry-specific keywords"])
     
     with col2:
         st.markdown("**Profile Summary:**")
         st.write(f"👤 **Name:** {st.session_state.user_data.get('name', 'N/A')}")
         st.write(f"💼 **Title:** {st.session_state.user_data.get('title', 'N/A')}")
-        st.write(f"🛠️ **Skills:** {len(st.session_state.user_data.get('skills', []))} skills")
         st.write(f"📧 **Email:** {st.session_state.user_data.get('email', 'N/A')}")
+        
+        if user_skills:
+            skills_count = len([skill.strip() for skill in user_skills.replace('\n', ',').split(',') if skill.strip()])
+            st.write(f"🛠️ **Skills Entered:** {skills_count}")
         
         if job_description:
             st.markdown("**🎯 AI Analysis:**")
             with st.spinner("Analyzing job requirements..."):
-                analysis = groq_service.analyze_job_requirements(job_description, st.session_state.user_data)
+                temp_data = st.session_state.user_data.copy()
+                temp_data['skills_input'] = user_skills
+                analysis = groq_service.analyze_job_requirements(job_description, temp_data)
                 st.success(f"✅ AI found {analysis.get('keyword_matches', 0)} matching keywords")
     
     if st.button("🚀 Generate AI Resume", type="primary", use_container_width=True):
+        if not user_skills.strip():
+            st.error("⚠️ Please enter your skills and experience to generate a resume.")
+            return
+            
         with st.spinner("🤖 AI is crafting your professional resume..."):
             enhanced_data = st.session_state.user_data.copy()
             enhanced_data['resume_style'] = resume_style
-            enhanced_data['ai_enhancements'] = ai_enhancements
+            enhanced_data['skills_input'] = user_skills
+            
+            # Parse skills from input
+            skills_list = []
+            for line in user_skills.split('\n'):
+                for skill in line.split(','):
+                    skill = skill.strip()
+                    if skill:
+                        skills_list.append(skill)
+            enhanced_data['skills'] = skills_list
             
             if job_description:
                 enhanced_data['target_job'] = job_description
@@ -571,52 +595,52 @@ def cover_letter_page(groq_service, cover_letter_gen):
     st.markdown("### 🤖 AI-Powered Personalized Cover Letters")
     st.info("Our AI will create compelling, personalized cover letters that get interviews!")
     
-    with st.form("cover_letter_form"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            company_name = st.text_input("🏢 Company Name:", placeholder="e.g., Google, Microsoft, Apple")
-            position = st.text_input("💼 Position Title:", placeholder="e.g., Software Engineer, Marketing Manager")
-            
-        with col2:
-            tone = st.selectbox("Writing Tone:", [
-                "Professional & Confident",
-                "Enthusiastic & Energetic", 
-                "Formal & Conservative",
-                "Creative & Personal",
-                "Technical & Precise"
-            ])
-            
-            length = st.selectbox("Letter Length:", [
-                "Concise (200-250 words)",
-                "Standard (300-400 words)",
-                "Detailed (450-500 words)"
-            ])
-        
-        job_description = st.text_area(
-            "📋 Job Description:", 
-            height=150,
-            placeholder="Paste the complete job description here for AI to analyze requirements and tailor your letter..."
-        )
-        
-        company_research = st.text_area(
-            "🔍 Company Research (Optional):",
-            height=100,
-            placeholder="Share what you know about the company, recent news, values, etc. AI will incorporate this for personalization."
-        )
-        
-        ai_features = st.multiselect("AI Enhancement Features:", [
-            "Research company background automatically",
-            "Include industry-specific terminology", 
-            "Add quantified achievements",
-            "Match communication style to company culture",
-            "Include trending skills for the role",
-            "Add call-to-action suggestions"
-        ], default=["Include industry-specific terminology", "Add quantified achievements"])
-        
-        submitted = st.form_submit_button("🚀 Generate AI Cover Letter", type="primary", use_container_width=True)
+    # Simple text box for skills and experience
+    user_skills_experience = st.text_area(
+        "💼 Enter Your Skills and Experience:",
+        height=120,
+        placeholder="Enter your relevant skills, experience, and achievements for this position.\n\nExample:\nPython, JavaScript, React development\nTeam leadership and project management\n3 years experience in full-stack development\nLed team of 5 developers on e-commerce project",
+        help="Describe your key skills, experience, and achievements relevant to the position you're applying for."
+    )
     
-    if submitted and company_name and position:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        company_name = st.text_input("🏢 Company Name:", placeholder="e.g., Google, Microsoft, Apple")
+        position = st.text_input("💼 Position Title:", placeholder="e.g., Software Engineer, Marketing Manager")
+        
+    with col2:
+        tone = st.selectbox("Writing Tone:", [
+            "Professional & Confident",
+            "Enthusiastic & Energetic", 
+            "Formal & Conservative",
+            "Creative & Personal",
+            "Technical & Precise"
+        ])
+        
+        length = st.selectbox("Letter Length:", [
+            "Concise (200-250 words)",
+            "Standard (300-400 words)",
+            "Detailed (450-500 words)"
+        ])
+        
+    job_description = st.text_area(
+        "📋 Job Description:", 
+        height=120,
+        placeholder="Paste the complete job description here for AI to analyze requirements and tailor your letter..."
+    )
+    
+    company_research = st.text_area(
+        "🔍 Company Research (Optional):",
+        height=80,
+        placeholder="Share what you know about the company, recent news, values, etc. AI will incorporate this for personalization."
+    )
+    
+    if st.button("🚀 Generate AI Cover Letter", type="primary", use_container_width=True):
+        if not company_name or not position or not user_skills_experience:
+            st.error("⚠️ Please fill in Company Name, Position Title, and your Skills/Experience to generate a cover letter.")
+            return
+            
         with st.spinner("🤖 AI is crafting your personalized cover letter..."):
             enhanced_data = st.session_state.user_data.copy()
             enhanced_data.update({
@@ -625,16 +649,24 @@ def cover_letter_page(groq_service, cover_letter_gen):
                 'tone': tone,
                 'length': length,
                 'company_research': company_research,
-                'ai_features': ai_features
+                'skills_experience_input': user_skills_experience
             })
+            
+            # Parse skills from input
+            skills_list = []
+            for line in user_skills_experience.split('\n'):
+                for skill in line.split(','):
+                    skill = skill.strip()
+                    if skill:
+                        skills_list.append(skill)
+            enhanced_data['skills'] = skills_list
             
             cover_letter = groq_service.generate_enhanced_cover_letter(
                 enhanced_data, 
                 job_description,
                 company_name,
                 position
-            )
-            
+            )            
         if cover_letter:
             st.success("✅ AI Cover letter generated successfully!")
             
@@ -704,17 +736,33 @@ def cover_letter_page(groq_service, cover_letter_gen):
         else:
             st.error("❌ Failed to generate cover letter")
             st.info("💡 Please check your inputs and try again.")
-    
-    elif submitted:
-        st.error("⚠️ Please fill in Company Name and Position Title to generate your cover letter.")
 
 def job_search_page(job_searcher):
     st.header("🔍 AI-Powered Job Search & Career Strategy")
     
-    tab1, tab2, tab3 = st.tabs(["🎯 Smart Job Search", "📬 AI Job Alerts", "🚀 Career Strategy"])
+    # Check LinkedIn API status
+    linkedin_status = job_searcher.validate_linkedin_access()
+    if linkedin_status:
+        st.success("🟢 LinkedIn API Connected - Enhanced job search available!")
+    else:
+        st.warning("🟡 LinkedIn API not configured - Using enhanced fallback search")
+        with st.expander("🔧 Configure LinkedIn API (Optional)"):
+            st.markdown("""
+            **To enable LinkedIn API integration:**
+            1. Create a LinkedIn Developer App at https://www.linkedin.com/developers/
+            2. Add these environment variables to your .env file:
+               - `LINKEDIN_CLIENT_ID=your_client_id`
+               - `LINKEDIN_CLIENT_SECRET=your_client_secret`
+               - `LINKEDIN_ACCESS_TOKEN=your_access_token`
+            3. Restart the application
+            
+            **Note:** The app works great without LinkedIn API using our enhanced search!
+            """)
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Smart Job Search", "📬 AI Job Alerts", "🚀 Career Strategy", "💼 Company Insights"])
     
     with tab1:
-        st.markdown("### 🤖 AI-Enhanced Job Discovery")
+        st.markdown("### 🤖 AI-Enhanced Job Discovery with LinkedIn Integration")
         
         col1, col2 = st.columns([2, 1])
         
@@ -726,10 +774,20 @@ def job_search_page(job_searcher):
                 col_a, col_b = st.columns(2)
                 with col_a:
                     experience_level = st.selectbox("Experience Level:", [
+                        "", 
                         "Entry Level (0-2 years)", 
                         "Mid Level (3-5 years)", 
                         "Senior Level (6-10 years)", 
                         "Executive (10+ years)"
+                    ])
+                    
+                    company_size = st.selectbox("Company Size:", [
+                        "",
+                        "Startup (1-50)",
+                        "Small (51-200)", 
+                        "Medium (201-1000)",
+                        "Large (1001-5000)",
+                        "Enterprise (5000+)"
                     ])
                 
                 with col_b:
@@ -739,37 +797,56 @@ def job_search_page(job_searcher):
                         "$60k - $80k", 
                         "$80k - $120k",
                         "$120k - $180k",
-                        "$180k+"
+                        "$180k - $250k",
+                        "$250k+"
                     ])
+                    
+                    remote_work = st.checkbox("Include Remote Jobs", value=True)
                 
-                ai_filters = st.multiselect("AI Smart Filters:", [
+                ai_filters = st.multiselect("🤖 AI Smart Filters:", [
                     "Match my skills automatically",
-                    "Remote-friendly companies", 
-                    "High growth startups",
+                    "High growth companies", 
+                    "Recently funded startups",
                     "Fortune 500 companies",
-                    "Companies with good culture",
-                    "Recently funded companies"
+                    "Companies with good culture ratings",
+                    "Fast-track career growth opportunities"
                 ])
                 
-                submitted = st.form_submit_button("🚀 AI-Powered Search", type="primary")
+                submitted = st.form_submit_button("🚀 Search LinkedIn Jobs", type="primary")
         
         with col2:
             if st.session_state.get("user_data"):
-                st.markdown("**🎯 AI Profile Match:**")
+                st.markdown("**🎯 AI Profile Analysis:**")
                 groq_service = st.session_state.get('groq_service')
                 if groq_service:
                     profile_strength = groq_service.analyze_profile_strength(st.session_state.user_data)
                     st.metric("Profile Strength", f"{profile_strength.get('score', 75)}%")
                     
-                    st.markdown("**💡 AI Suggestions:**")
+                    st.markdown("**💡 AI Optimization Tips:**")
                     suggestions = profile_strength.get('suggestions', [])
                     for suggestion in suggestions[:3]:
                         st.write(f"• {suggestion}")
+                        
+                # Add salary insights
+                if keywords:
+                    with st.spinner("Getting salary insights..."):
+                        salary_data = job_searcher.get_salary_insights(keywords, location)
+                        if salary_data:
+                            st.markdown("**💰 Salary Insights:**")
+                            st.write(f"**Median:** ${salary_data.get('median_salary', 0):,}")
+                            st.write(f"**Range:** ${salary_data.get('min_salary', 0):,} - ${salary_data.get('max_salary', 0):,}")
         
         if submitted and keywords:
-            with st.spinner("🤖 AI is finding the best job matches for you..."):
-                # Get job search results
-                jobs = job_searcher.search_jobs(keywords, location, experience_level)
+            with st.spinner("🤖 Searching LinkedIn and analyzing job matches..."):
+                # Enhanced job search with LinkedIn API
+                jobs = job_searcher.search_jobs(
+                    keywords=keywords, 
+                    location=location, 
+                    experience_level=experience_level,
+                    company_size=company_size,
+                    remote=remote_work,
+                    limit=25
+                )
                 
                 # Enhance with AI analysis if we have user data
                 if st.session_state.get("user_data") and jobs:
@@ -777,44 +854,102 @@ def job_search_page(job_searcher):
                     jobs = enhanced_jobs
                 
             if jobs:
-                st.success(f"🎉 Found {len(jobs)} AI-curated job opportunities!")
+                st.success(f"🎉 Found {len(jobs)} job opportunities from LinkedIn and other sources!")
                 
-                for i, job in enumerate(jobs):
-                    with st.expander(f"🎯 {job.get('title', 'Job Title')} at {job.get('company', 'Company')} - Match: {job.get('ai_match_score', 'N/A')}%"):
+                # Add filter and sort options
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    sort_by = st.selectbox("Sort by:", ["Relevance", "Date Posted", "Company", "Match Score"])
+                with col2:
+                    company_filter = st.multiselect("Filter by Company:", 
+                                                   options=list(set([job.get('company', '') for job in jobs])))
+                with col3:
+                    show_only_remote = st.checkbox("Show only remote jobs")
+                
+                # Apply filters
+                filtered_jobs = jobs
+                if company_filter:
+                    filtered_jobs = [job for job in jobs if job.get('company') in company_filter]
+                if show_only_remote:
+                    filtered_jobs = [job for job in jobs if job.get('remote_type')]
+                
+                # Display jobs
+                for i, job in enumerate(filtered_jobs):
+                    match_score = job.get('ai_match_score', job.get('overall_fit', 'N/A'))
+                    source_icon = "🔗" if job.get('source') == 'linkedin_api' else "🤖"
+                    
+                    with st.expander(f"{source_icon} {job.get('title', 'Job Title')} at {job.get('company', 'Company')} - Match: {match_score}%"):
                         col1, col2 = st.columns([2, 1])
                         
                         with col1:
                             st.write(f"📍 **Location:** {job.get('location', 'N/A')}")
-                            st.write(f"💰 **Salary:** {job.get('salary', 'Not specified')}")
+                            st.write(f"💰 **Salary:** {job.get('salary_range', 'Not specified')}")
                             st.write(f"📅 **Posted:** {job.get('posted_date', 'Recently')}")
-                            st.write(f"📋 **Description:** {job.get('description', 'No description available')[:200]}...")
+                            st.write(f"🏢 **Company Size:** {job.get('company_size', 'Not specified')}")
+                            st.write(f"⏰ **Type:** {job.get('employment_type', 'Full-time')}")
                             
+                            if job.get('remote_type'):
+                                st.write("🏠 **Remote-friendly**")
+                            
+                            st.write(f"📋 **Description:** {job.get('description', 'No description available')[:300]}...")
+                            
+                            # Show skills and requirements
+                            if job.get('skills'):
+                                st.write(f"🛠️ **Key Skills:** {', '.join(job.get('skills', [])[:5])}")
+                            
+                            if job.get('benefits'):
+                                st.write(f"💎 **Benefits:** {', '.join(job.get('benefits', [])[:3])}...")
+                            
+                            # AI Analysis
                             if job.get('ai_analysis'):
                                 st.markdown("**🤖 AI Analysis:**")
                                 st.info(job.get('ai_analysis'))
+                            
+                            # Match breakdown
+                            if job.get('skills_match') or job.get('experience_match'):
+                                st.markdown("**📊 Match Breakdown:**")
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    if job.get('skills_match'):
+                                        st.metric("Skills Match", f"{job.get('skills_match')}%")
+                                with col_b:
+                                    if job.get('experience_match'):
+                                        st.metric("Experience Match", f"{job.get('experience_match')}%")
                         
                         with col2:
-                            if job.get('url'):
-                                st.link_button("🚀 Apply Now", job['url'], use_container_width=True)
+                            # Action buttons
+                            if job.get('linkedin_url'):
+                                st.link_button("🔗 View on LinkedIn", job['linkedin_url'], use_container_width=True)
                             
+                            if job.get('application_url'):
+                                st.link_button("🚀 Apply Now", job['application_url'], use_container_width=True)
+                                
                             if st.button(f"📝 Generate Cover Letter", key=f"cover_{i}"):
-                                st.info("Navigate to Cover Letter Generator to create a tailored letter for this role!")
+                                st.info("📝 Navigate to Cover Letter Generator to create a tailored letter for this role!")
                             
-                            if job.get('skills_match'):
-                                st.markdown(f"**Skills Match:** {job.get('skills_match')}%")
+                            if st.button(f"🏢 Company Insights", key=f"company_{i}"):
+                                with st.spinner("Fetching company insights..."):
+                                    company_info = job_searcher.get_company_insights(job.get('company', ''))
+                                    st.json(company_info)
                             
-                            if job.get('experience_match'):
-                                st.markdown(f"**Experience Match:** {job.get('experience_match')}%")
+                            # Save job functionality
+                            if st.button(f"💾 Save Job", key=f"save_{i}"):
+                                if 'saved_jobs' not in st.session_state:
+                                    st.session_state.saved_jobs = []
+                                st.session_state.saved_jobs.append(job)
+                                st.success("Job saved!")
             else:
-                st.info("🔍 No jobs found. Try different keywords or broader location terms.")
+                st.info("🔍 No jobs found. Try different keywords or broader search terms.")
                 
                 if st.session_state.get("user_data"):
                     st.markdown("### 💡 AI Career Suggestions")
-                    career_suggestions = groq_service.generate_career_suggestions(st.session_state.user_data, keywords)
-                    st.markdown(career_suggestions)
+                    groq_service = st.session_state.get('groq_service')
+                    if groq_service:
+                        career_suggestions = groq_service.generate_career_suggestions(st.session_state.user_data, keywords)
+                        st.markdown(career_suggestions)
     
     with tab2:
-        st.markdown("### 📬 Smart Job Alerts with AI")
+        st.markdown("### 📬 Smart Job Alerts with LinkedIn Integration")
         
         with st.form("alert_form"):
             col1, col2 = st.columns(2)
@@ -822,34 +957,56 @@ def job_search_page(job_searcher):
             with col1:
                 alert_keywords = st.text_input("🎯 Alert Keywords:")
                 alert_email = st.text_input("📧 Email for Alerts:")
+                alert_location = st.text_input("📍 Preferred Locations:")
                 
             with col2:
                 alert_frequency = st.selectbox("📅 Frequency:", ["Daily", "Weekly", "Bi-weekly"])
+                alert_experience = st.selectbox("Experience Level:", [
+                    "Any", "Entry Level", "Mid Level", "Senior Level", "Executive"
+                ])
                 ai_personalization = st.checkbox("🤖 AI Personalization", value=True, 
                                                help="AI will filter and rank jobs based on your profile")
             
-            advanced_filters = st.multiselect("🔧 Advanced AI Filters:", [
-                "Salary growth potential",
-                "Company culture match",
+            advanced_filters = st.multiselect("🔧 Advanced LinkedIn Filters:", [
+                "Only LinkedIn verified companies",
+                "Salary growth potential analysis",
+                "Company culture match scoring",
                 "Career advancement opportunities", 
                 "Remote work policies",
                 "Learning and development programs",
-                "Diversity and inclusion focus"
+                "Diversity and inclusion focus",
+                "Stock options/equity available",
+                "Recently funded companies"
             ])
             
-            alert_submitted = st.form_submit_button("🚀 Set Up AI Job Alert", type="primary")
+            alert_submitted = st.form_submit_button("🚀 Set Up LinkedIn Job Alert", type="primary")
             
             if alert_submitted and alert_keywords and alert_email:
-                st.success("✅ AI-powered job alert set up successfully!")
+                st.success("✅ AI-powered LinkedIn job alert set up successfully!")
                 st.info(f"🤖 You'll receive {alert_frequency.lower()} AI-curated alerts for '{alert_keywords}' jobs.")
                 
+                # Preview of what the alert would contain
                 if ai_personalization and st.session_state.get("user_data"):
-                    alert_preview = groq_service.generate_alert_preview(alert_keywords, st.session_state.user_data)
-                    st.markdown("### 📋 Alert Preview")
-                    st.markdown(alert_preview)
+                    with st.spinner("Generating alert preview..."):
+                        preview_jobs = job_searcher.get_job_alerts(
+                            st.session_state.user_data, 
+                            {
+                                'keywords': alert_keywords,
+                                'location': alert_location,
+                                'experience_level': alert_experience
+                            }
+                        )
+                        
+                        if preview_jobs:
+                            st.markdown("### 📋 Alert Preview")
+                            st.markdown(f"Here's what your {alert_frequency.lower()} alert would include:")
+                            
+                            for job in preview_jobs[:3]:  # Show top 3
+                                st.markdown(f"**• {job.get('title')} at {job.get('company')}** - {job.get('location')}")
+                                st.markdown(f"  Posted: {job.get('posted_date')} | Match: {job.get('ai_match_score', 'N/A')}%")
     
     with tab3:
-        st.markdown("### 🚀 AI Career Strategy & Growth")
+        st.markdown("### 🚀 AI Career Strategy & LinkedIn Growth")
         
         if not st.session_state.get("user_data"):
             st.warning("Complete your profile to get personalized AI career strategy!")
@@ -866,7 +1023,8 @@ def job_search_page(job_searcher):
                 "Switch to new industry/field", 
                 "Start own business/consulting",
                 "Increase salary significantly",
-                "Improve work-life balance"
+                "Improve work-life balance",
+                "Build stronger LinkedIn presence"
             ])
             
             time_horizon = st.selectbox("⏰ Timeline:", [
@@ -874,32 +1032,137 @@ def job_search_page(job_searcher):
             ])
             
             if st.button("🤖 Generate AI Career Strategy", type="primary"):
-                with st.spinner("🤖 AI is creating your personalized career strategy..."):
-                    strategy = groq_service.generate_comprehensive_career_strategy(
-                        st.session_state.user_data, career_goals, time_horizon
-                    )
+                with st.spinner("🤖 AI is creating your personalized career strategy using LinkedIn insights..."):
+                    groq_service = st.session_state.get('groq_service')
+                    if groq_service:
+                        strategy = groq_service.generate_comprehensive_career_strategy(
+                            st.session_state.user_data, career_goals, time_horizon
+                        )
+                        
+                        # Add LinkedIn-specific recommendations
+                        linkedin_strategy = f"""
+                        
+                        ### 🔗 LinkedIn-Specific Action Plan:
+                        
+                        **Profile Optimization:**
+                        - Update your LinkedIn headline to include trending keywords for your field
+                        - Add a professional summary highlighting your {career_goals.lower()}
+                        - Request recommendations from colleagues and managers
+                        
+                        **Networking Strategy:**
+                        - Connect with 10-15 professionals weekly in your target field
+                        - Engage with posts from industry leaders daily
+                        - Share insights about your expertise 2-3 times per week
+                        
+                        **Content Strategy:**
+                        - Post about your learning journey and projects
+                        - Share industry insights and trends
+                        - Comment thoughtfully on posts from your network
+                        
+                        **Job Search Optimization:**
+                        - Set up LinkedIn job alerts for your target roles
+                        - Use LinkedIn's "Open to Work" feature strategically
+                        - Research hiring managers and companies of interest
+                        """
                 
                 st.markdown("### 📋 Your AI-Generated Career Strategy")
                 st.markdown(strategy)
+                st.markdown(linkedin_strategy)
         
         with col2:
             st.markdown("#### 📊 Career Analytics")
             
             if st.button("🔍 Analyze Career Potential"):
-                analysis = groq_service.analyze_career_potential(st.session_state.user_data)
+                groq_service = st.session_state.get('groq_service')
+                if groq_service:
+                    analysis = groq_service.analyze_career_potential(st.session_state.user_data)
+                    
+                    st.metric("Market Demand", f"{analysis.get('market_demand', 75)}%")
+                    st.metric("Salary Growth Potential", f"{analysis.get('salary_growth', 85)}%") 
+                    st.metric("Skill Relevance", f"{analysis.get('skill_relevance', 90)}%")
+                    
+                    st.markdown("**🎯 Growth Areas:**")
+                    for area in analysis.get('growth_areas', [])[:3]:
+                        st.write(f"• {area}")
+            
+            # LinkedIn Skills Trending
+            st.markdown("#### 🔥 Trending LinkedIn Skills")
+            if st.button("📊 Get Trending Skills"):
+                user_title = st.session_state.user_data.get('title', '')
+                trending_skills = job_searcher.get_trending_skills(user_title)
                 
-                st.metric("Market Demand", f"{analysis.get('market_demand', 75)}%")
-                st.metric("Salary Growth Potential", f"{analysis.get('salary_growth', 85)}%") 
-                st.metric("Skill Relevance", f"{analysis.get('skill_relevance', 90)}%")
-                
-                st.markdown("**🎯 Growth Areas:**")
-                for area in analysis.get('growth_areas', [])[:3]:
-                    st.write(f"• {area}")
+                st.markdown("**Most In-Demand Skills:**")
+                for skill in trending_skills[:8]:
+                    st.write(f"🔥 {skill}")
             
             st.markdown("#### 📚 AI Learning Path")
             if st.button("📖 Get Learning Recommendations"):
-                learning_path = groq_service.generate_learning_path(st.session_state.user_data)
-                st.markdown(learning_path)
+                groq_service = st.session_state.get('groq_service')
+                if groq_service:
+                    learning_path = groq_service.generate_learning_path(st.session_state.user_data)
+                    st.markdown(learning_path)
+    
+    with tab4:
+        st.markdown("### 💼 Company Research & Insights")
+        
+        company_search = st.text_input("🔍 Search for Companies:", placeholder="e.g., Google, Microsoft, OpenAI")
+        
+        if company_search:
+            if st.button("🔍 Research Company"):
+                with st.spinner("Researching company..."):
+                    company_info = job_searcher.get_company_insights(company_search)
+                    
+                    if company_info:
+                        st.markdown(f"### 🏢 {company_info.get('name', company_search)}")
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Industry:** {company_info.get('industry', 'N/A')}")
+                            st.write(f"**Size:** {company_info.get('size', 'N/A')} employees")
+                            st.write(f"**Founded:** {company_info.get('founded_year', 'N/A')}")
+                            st.write(f"**Headquarters:** {company_info.get('headquarters', 'N/A')}")
+                            
+                        with col2:
+                            if company_info.get('linkedin_url'):
+                                st.link_button("🔗 LinkedIn Page", company_info['linkedin_url'])
+                            if company_info.get('website'):
+                                st.link_button("🌐 Website", company_info['website'])
+                        
+                        st.markdown("**About:**")
+                        st.write(company_info.get('description', 'No description available'))
+                        
+                        # Get current job openings
+                        if st.button("💼 View Current Openings"):
+                            with st.spinner("Finding current job openings..."):
+                                openings = job_searcher.search_jobs(
+                                    keywords=st.session_state.user_data.get('title', 'engineer'),
+                                    location="",
+                                    limit=10
+                                )
+                                
+                                company_jobs = [job for job in openings if 
+                                              company_info.get('name', '').lower() in job.get('company', '').lower()]
+                                
+                                if company_jobs:
+                                    st.markdown(f"**Current Openings at {company_info.get('name')}:**")
+                                    for job in company_jobs:
+                                        st.markdown(f"• **{job.get('title')}** - {job.get('location')}")
+                                else:
+                                    st.info("No current openings found. Set up a job alert to be notified!")
+        
+        # Saved jobs section
+        if st.session_state.get('saved_jobs'):
+            st.markdown("### 💾 Your Saved Jobs")
+            for i, job in enumerate(st.session_state.saved_jobs):
+                with st.expander(f"{job.get('title')} at {job.get('company')}"):
+                    st.write(f"📍 **Location:** {job.get('location')}")
+                    st.write(f"💰 **Salary:** {job.get('salary_range', 'Not specified')}")
+                    st.write(f"📅 **Saved on:** {job.get('saved_date', 'Recently')}")
+                    
+                    if st.button(f"Remove", key=f"remove_{i}"):
+                        st.session_state.saved_jobs.pop(i)
+                        st.rerun()
 
 def interview_page(interview_sim):
     st.header("🎤 AI Interview Simulator")
