@@ -1,2 +1,2 @@
 # Portfolio-AI
-An LLM powered portfolio designer web app which a Linkedin Profile as an input and creates a portfolio webiste, ATS ready resume 
+An AI-powered career assistant web app that uses resume uploads and profile data to create professional portfolios, ATS-optimized resumes, cover letters, and provides intelligent job search with Google Cloud Talent Solution API integration.

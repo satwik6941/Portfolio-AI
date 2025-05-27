@@ -157,12 +157,12 @@ class InterviewUI:
         
         with col2:
             experience_level = st.selectbox("Experience Level", 
-                                          ["Entry Level", "Mid Level", "Senior Level", "Executive"])
+                                            ["Entry Level", "Mid Level", "Senior Level", "Executive"])
             interview_type = st.selectbox("Interview Type", 
                                         ["General", "Technical", "Behavioral", "Case Study"])
         
         job_description = st.text_area("Job Description (Optional)", 
-                                     placeholder="Paste the job description here for more targeted questions...")
+                                        placeholder="Paste the job description here for more targeted questions...")
         
         if st.button("Start Interview", type="primary"):
             if job_title:

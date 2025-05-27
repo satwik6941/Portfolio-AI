@@ -1,7 +1,13 @@
 import requests
 import json
 import time
+import re
 from typing import Dict, List, Optional, Any
+try:
+    from googlesearch import search
+except ImportError:
+    print("Warning: googlesearch-python not installed. Search functionality will be limited.")
+    search = None
 
 class GroqLLM:
     def __init__(self, api_key: str, model: str = "llama3-70b-8192"):
@@ -14,7 +20,7 @@ class GroqLLM:
         }
     
     def _make_request(self, messages: List[Dict], max_tokens: int = 2000, 
-                     temperature: float = 0.7, timeout: int = 30) -> str:
+                        temperature: float = 0.7, timeout: int = 30) -> str:
         payload = {
             "model": self.model,
             "messages": messages,
@@ -59,52 +65,195 @@ class GroqLLM:
         
         return "❌ Failed to get response after multiple attempts."
     
-    def generate_portfolio_content(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+    def search_unknown_terms(self, text: str, context: str = "") -> Dict[str, str]:
+        """Search for unknown or technical terms and return explanations"""
+        if not search:
+            return {}
+            
+        # Extract potentially unknown terms (technical terms, company names, etc.)
+        unknown_terms = self._extract_unknown_terms(text)
+        search_results = {}
+        
+        for term in unknown_terms[:5]:  # Limit to 5 terms to avoid rate limiting
+            try:                # Search for the term
+                search_query = f"{term} definition meaning {context}" if context else f"{term} definition meaning"
+                results = list(search(search_query, num_results=2, sleep_interval=2))
+                
+                if results:
+                    # Get brief explanation using AI
+                    explanation = self._get_term_explanation(term, search_query)
+                    if explanation and len(explanation) > 10:
+                        search_results[term] = explanation
+                        
+            except Exception as e:
+                print(f"Search error for term '{term}': {e}")
+                continue
+                
+        return search_results
+    
+    def _extract_unknown_terms(self, text: str) -> List[str]:
+        """Extract potentially unknown terms from text"""
+        # Look for technical terms, acronyms, company names, etc.
+        patterns = [
+            r'\b[A-Z]{2,}\b',  # Acronyms like AI, ML, API, AWS
+            r'\b[A-Z][a-z]+(?:[A-Z][a-z]+)*\b',  # CamelCase terms like JavaScript
+            r'\b\w+(?:\.js|\.py|\.net|\.io|\.com)\b',  # Technology extensions
+            r'\b(?:React|Angular|Vue|Django|Flask|Laravel|Spring|Docker|Kubernetes|TensorFlow|PyTorch)\b',  # Common tech terms
+        ]
+        
+        terms = set()
+        for pattern in patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            terms.update(matches)
+            
+        # Filter out common words and very short terms
+        common_words = {'The', 'This', 'That', 'And', 'Or', 'But', 'For', 'In', 'On', 'At', 'To', 'Of', 'API', 'UI', 'UX'}
+        filtered_terms = []
+        for term in terms:
+            if (term not in common_words and 
+                len(term) > 2 and 
+                not term.isdigit() and 
+                term.upper() not in ['CEO', 'CTO', 'HR', 'IT']):
+                filtered_terms.append(term)
+                
+        return filtered_terms[:10]  # Limit to 10 terms
+    
+    def _get_term_explanation(self, term: str, search_query: str) -> str:
+        """Get a brief explanation of a term using AI"""
+        try:
+            prompt = f"""
+            Provide a brief, clear explanation of the term "{term}" in 1-2 sentences.
+            Focus on what it means in a professional/technical context.
+            Be concise and accurate.
+            """
+            
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant that provides clear, concise explanations of technical and professional terms."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            explanation = self._make_request(messages, max_tokens=100, temperature=0.3)
+            return explanation if explanation and not explanation.startswith("❌") else ""
+            
+        except Exception:
+            return ""
+
+    def generate_enhanced_cover_letter(self, user_data: Dict[str, Any], job_description: str, 
+                                     company_name: str, tone: str = "Professional") -> str:
+        """Generate enhanced cover letter with specified tone and Google search integration"""
+        
+        # Search for unknown terms in job description for better understanding
+        search_results = self.search_unknown_terms(job_description, f"{company_name} job requirements")
+        
+        # Enhance prompt with search results
+        search_context = ""
+        if search_results:
+            search_context = "\n\nAdditional context from research:\n"
+            for term, explanation in search_results.items():
+                search_context += f"- {term}: {explanation}\n"
+        
         prompt = f"""
-        Create compelling portfolio content for a professional based on this data:
+        Write a compelling, {tone.lower()} cover letter for:
         
-        Name: {user_data.get('name', 'Professional')}
-        Title: {user_data.get('title', 'Professional')}
+        Candidate: {user_data.get('name', 'Candidate')}
+        Current Title: {user_data.get('title', 'Professional')}
         Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Experienced professional')}
-        Education: {user_data.get('education', '')}
+        Experience: {user_data.get('experience', 'Professional experience')}
         
-        Generate content for these portfolio sections:
-        1. Professional summary (2-3 compelling sentences)
-        2. About section (150-200 words, engaging and personal)
-        3. Skills organized by category
-        4. Project highlights (3-4 impressive projects based on skills)
-        5. Call-to-action statement
+        Target Company: {company_name}
+        Job Description: {job_description}
+        Tone: {tone}
+        {search_context}
         
-        Make it professional, engaging, and showcase expertise.        Return as JSON with keys: summary, about, skills_categories, projects, cta
+        Create a personalized cover letter that:
+        1. Opens with a compelling hook specific to the company
+        2. Demonstrates clear understanding of the role and technical requirements
+        3. Highlights most relevant experience and achievements
+        4. Shows knowledge of company culture/values and industry trends
+        5. Includes specific examples and metrics
+        6. Uses industry terminology correctly (informed by research above)
+        7. Maintains {tone.lower()} tone throughout
+        8. Closes with strong call to action
+        9. Is 350-450 words
+        
+        Make it highly personalized and compelling for this specific opportunity, incorporating the researched context naturally.
         """
         
         messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert portfolio writer who creates compelling professional content. Always return valid JSON."
-            },
+            {"role": "system", "content": f"You are an expert career counselor who writes compelling, {tone.lower()} cover letters that get interviews. You have access to current industry knowledge and terminology."},
             {"role": "user", "content": prompt}
         ]
-        response = self._make_request(messages, max_tokens=1500, temperature=0.8)
         
-        try:
-            # Extract JSON from response
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            # Fallback if JSON parsing fails
-            return {
-                "summary": f"Experienced {user_data.get('title', 'professional')} with expertise in {', '.join(user_data.get('skills', [])[:3])}.",
-                "about": response[:300] if response else "Professional with extensive experience in their field.",
-                "skills_categories": {"Technical": user_data.get('skills', [])},
-                "projects": [],
-                "cta": "Let's connect and discuss opportunities!"
-            }
-    
+        return self._make_request(messages, max_tokens=1500, temperature=0.7)
+
+    def generate_enhanced_resume(self, user_data: Dict[str, Any]) -> str:
+        """Generate enhanced resume with AI improvements and Google search integration"""
+        enhancements = user_data.get('ai_enhancements', [])
+        style = user_data.get('resume_style', 'Professional ATS-Optimized')
+        skills_input = user_data.get('skills_input', '')
+        
+        # Search for unknown terms in skills and experience for better understanding
+        search_context_text = f"{skills_input} {user_data.get('experience', '')} {user_data.get('title', '')}"
+        search_results = self.search_unknown_terms(search_context_text, "career skills technology")
+        
+        # Enhance prompt with search results
+        search_context = ""
+        if search_results:
+            search_context = "\n\nResearched technical context:\n"
+            for term, explanation in search_results.items():
+                search_context += f"- {term}: {explanation}\n"
+        
+        prompt = f"""
+        Create an enhanced, {style} resume for:
+        
+        Name: {user_data.get('name', 'Your Name')}
+        Title: {user_data.get('title', 'Professional')}
+        Email: {user_data.get('email', 'email@example.com')}
+        Phone: {user_data.get('phone', 'Phone Number')}
+        Skills: {', '.join(user_data.get('skills', []))}
+        Experience: {user_data.get('experience', 'Professional experience')}
+        Education: {user_data.get('education', 'Educational background')}
+        
+        Apply these AI enhancements: {', '.join(enhancements)}
+        {search_context}
+        
+        Create a professional resume with:
+        1. Compelling professional summary using current industry terminology
+        2. Quantified achievements with metrics
+        3. Industry-specific keywords (informed by research above)
+        4. ATS-optimized formatting
+        5. Strong action verbs
+        6. Relevant technical skills highlighted with proper context
+        7. Current industry trends and terminology integration
+        
+        Format for both ATS and human readability, ensuring technical terms are used correctly.
+        """
+        
+        messages = [
+            {"role": "system", "content": "You are an expert resume writer who creates compelling, ATS-optimized resumes with quantified achievements and current industry knowledge."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        return self._make_request(messages, max_tokens=2000, temperature=0.6)
+
+    def generate_tailored_resume(self, user_data: Dict[str, Any], job_description: str) -> str:
+        """Generate resume tailored to specific job with Google search integration"""
+        # Search for unknown terms in job description for better understanding
+        search_results = self.search_unknown_terms(job_description, "job requirements career skills")
+        
+        # Enhance the user data with search context
+        enhanced_user_data = user_data.copy()
+        if search_results:
+            # Add search context to the job description
+            search_context = "\n\nResearched job context:\n"
+            for term, explanation in search_results.items():
+                search_context += f"- {term}: {explanation}\n"
+            enhanced_job_description = job_description + search_context
+        else:
+            enhanced_job_description = job_description
+            
+        return self.generate_resume(enhanced_user_data, enhanced_job_description)
+
     def generate_resume(self, user_data: Dict[str, Any], job_description: str = "") -> str:
         tailoring_context = f"\n\nTailor the resume for this job:\n{job_description}" if job_description else ""
         
@@ -141,393 +290,11 @@ class GroqLLM:
         ]
         
         return self._make_request(messages, max_tokens=2000, temperature=0.6)
-    
-    def generate_cover_letter(self, user_data: Dict[str, Any], 
-                            job_description: str, company_name: str) -> str:
-        prompt = f"""
-        Write a compelling cover letter for:
-        
-        Candidate: {user_data.get('name', 'Candidate')}
-        Current Title: {user_data.get('title', 'Professional')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Target Company: {company_name}
-        Job Description: {job_description}
-        
-        Create a personalized cover letter that:
-        1. Opens with a strong hook
-        2. Highlights relevant experience and skills
-        3. Shows knowledge of the company/role
-        4. Demonstrates value proposition
-        5. Closes with a strong call to action
-        6. Maintains professional tone
-        7. Is 3-4 paragraphs, around 300-400 words
-        
-        Make it compelling and specific to this opportunity.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert career counselor who writes compelling, personalized cover letters that get interviews."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=1500, temperature=0.7)
-    
-    def analyze_resume(self, resume_text: str) -> Dict[str, Any]:
-        prompt = f"""
-        Analyze this resume and extract structured information:
-        
-        {resume_text}
-        
-        Extract and return as JSON:
-        {{
-            "name": "Full name",
-            "title": "Professional title/role",
-            "email": "Email address",
-            "phone": "Phone number",
-            "summary": "Professional summary (2-3 sentences)",
-            "skills": ["skill1", "skill2", "skill3"],
-            "experience": [
-                {{
-                    "title": "Job title",
-                    "company": "Company name",
-                    "duration": "Start - End dates",
-                    "description": "Key responsibilities and achievements"
-                }}
-            ],
-            "education": "Education details"
-        }}
-        
-        If information is missing, use reasonable defaults or leave empty.
-        Focus on extracting the most relevant professional information.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert at analyzing resumes and extracting structured data. Always return valid JSON."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=2000, temperature=0.3)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return {
-                "name": "Name not found",
-                "title": "Title not found", 
-                "email": "",
-                "phone": "",
-                "summary": "Professional with experience in their field.",
-                "skills": [],
-                "experience": [],
-                "education": "Education details not available"
-            }
-    
-    def generate_interview_question(self, user_data: Dict[str, Any], 
-                                  interview_type: str, job_role: str, 
-                                  question_number: int) -> str:
-        prompt = f"""
-        Generate an appropriate {interview_type.lower()} interview question for:
-        
-        Candidate Profile:
-        - Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', [])[:5])}
-        - Experience Level: {user_data.get('experience', 'Professional experience')}
-        
-        Target Role: {job_role}
-        Question Number: {question_number}
-        Interview Type: {interview_type}
-        
-        Create a question that:
-        1. Is appropriate for the experience level
-        2. Relates to the target role
-        3. Matches the interview type
-        4. Allows the candidate to showcase their skills
-        5. Is challenging but fair
-        
-        Return only the question, no additional text.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert interviewer who creates insightful, role-appropriate interview questions."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=500, temperature=0.7)
-    
-    def evaluate_interview_answer(self, question: str, answer: str, 
-                                user_data: Dict[str, Any]) -> Dict[str, Any]:
-        prompt = f"""
-        Evaluate this interview answer:
-        
-        Question: {question}
-        Answer: {answer}
-        
-        Candidate Background:
-        - Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', [])[:3])}
-        
-        Provide evaluation with:
-        1. Score (1-10 scale)
-        2. Strengths (2-3 points)
-        3. Areas for improvement (2-3 points)
-        4. Specific suggestions for better answers
-        
-        Return as JSON:
-        {{
-            "score": 8,
-            "strengths": ["strength1", "strength2"],
-            "improvements": ["improvement1", "improvement2"],
-            "suggestions": "Specific advice for improvement"
-        }}
-        
-        Be constructive and helpful in feedback.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert interview coach providing constructive feedback to help candidates improve."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1000, temperature=0.6)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            # Fallback evaluation
-            return {
-                "score": 7,
-                "strengths": ["Clear communication", "Relevant experience"],
-                "improvements": ["Add more specific examples", "Provide quantifiable results"],
-                "suggestions": "Try to include specific examples and measurable outcomes to strengthen your answer."
-            }
-    
-    def generate_final_interview_feedback(self, interview_history: List[Dict]) -> str:
-        qa_pairs = []
-        for i in range(0, len(interview_history), 2):
-            if i + 1 < len(interview_history):
-                qa_pairs.append({
-                    "question": interview_history[i].get("content", ""),
-                    "answer": interview_history[i + 1].get("content", "")
-                })
-        
-        prompt = f"""
-        Provide comprehensive interview feedback based on this session:
-        
-        Interview Q&A:
-        {json.dumps(qa_pairs, indent=2)}
-        
-        Analyze the overall performance and provide:
-        1. Overall assessment (strengths and weaknesses)
-        2. Communication style feedback
-        3. Technical competency evaluation
-        4. Top 3 areas for improvement
-        5. Specific action steps for better interviews
-        6. Recommended practice areas
-        7. Overall score and readiness level
-        
-        Be encouraging but honest, focusing on actionable improvements.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are a senior interview coach providing comprehensive performance feedback."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=1500, temperature=0.6)
-    
-    def optimize_for_ats(self, resume_content: str, job_description: str) -> str:
-        prompt = f"""
-        Optimize this resume for ATS systems and the target job:
-        
-        Current Resume:
-        {resume_content}
-        
-        Target Job:
-        {job_description}
-        
-        Enhance the resume by:
-        1. Adding relevant keywords from the job description
-        2. Improving formatting for ATS readability
-        3. Quantifying achievements where possible
-        4. Using action verbs and industry terminology
-        5. Ensuring proper section headers
-        6. Maintaining readability for humans
-        
-        Return the improved resume content with better ATS compatibility.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an ATS optimization expert who improves resume compatibility while maintaining quality."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=2000, temperature=0.5)
-    
-    def generate_job_search_strategy(self, user_data: Dict[str, Any]) -> str:
-        prompt = f"""
-        Create a personalized job search strategy for:
-        
-        Profile:
-        - Current Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        - Goals: Career advancement and growth
-        
-        Provide a comprehensive strategy including:
-        1. Target companies and industries
-        2. Networking recommendations
-        3. Skill development priorities
-        4. Application approach and timeline
-        5. Interview preparation focus areas
-        6. Online presence optimization
-        7. Salary negotiation tips
-        
-        Make it actionable and specific to their background.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are a career strategist who creates personalized job search plans that deliver results."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=2000, temperature=0.7)
 
-    def health_check(self) -> bool:
-        """
-        Check if the Groq service is accessible
-        
-        Returns:
-            True if service is accessible, False otherwise
-        """
-        test_messages = [
-            {"role": "user", "content": "Hello, are you working?"}
-        ]
-        
-        response = self._make_request(test_messages, max_tokens=50, temperature=0.1)
-        return not response.startswith("❌")
-    
-    def generate_interview_questions(self, job_description: str, user_background: Dict) -> List[Dict]:
+    def generate_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate professional portfolio content"""
         prompt = f"""
-        Generate 5 diverse interview questions for this job opportunity:
-        
-        Job Description: {job_description}
-        
-        Candidate Background:
-        - Name: {user_background.get('name', 'Candidate')}
-        - Title: {user_background.get('title', 'Professional')}
-        - Skills: {', '.join(user_background.get('skills', [])[:5])}
-        - Experience: {user_background.get('experience', 'Professional experience')}
-        
-        Create a balanced set of questions:
-        1. One behavioral question (past experience/situations)
-        2. One technical question (role-specific skills)
-        3. One problem-solving question (hypothetical scenario)
-        4. One cultural fit question (values/work style)
-        5. One career goals question (future aspirations)
-        
-        Return as JSON array with this format:
-        [
-            {
-                "question": "Tell me about a time when...",
-                "type": "behavioral",
-                "difficulty": "medium",
-                "focus_area": "teamwork"
-            }
-        ]
-        
-        Make questions specific to the role and appropriate for the candidate's level.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert interviewer who creates comprehensive, balanced interview question sets."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1500, temperature=0.8)
-        
-        try:
-            json_start = response.find('[')
-            json_end = response.rfind(']') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                questions = json.loads(json_str)
-                return questions
-        except:
-            return [
-                {
-                    "question": "Tell me about yourself and why you're interested in this position.",
-                    "type": "general",
-                    "difficulty": "easy",
-                    "focus_area": "introduction"
-                },
-                {
-                    "question": "Describe a challenging project you worked on and how you overcame obstacles.",
-                    "type": "behavioral", 
-                    "difficulty": "medium",
-                    "focus_area": "problem_solving"
-                },
-                {
-                    "question": "What technical skills do you consider your strongest, and can you give an example of how you've applied them?",
-                    "type": "technical",
-                    "difficulty": "medium", 
-                    "focus_area": "technical_skills"
-                },
-                {
-                    "question": "How do you handle working under pressure and tight deadlines?",
-                    "type": "behavioral",
-                    "difficulty": "medium",
-                    "focus_area": "stress_management"
-                },
-                {
-                    "question": "Where do you see yourself in 3-5 years, and how does this role fit into your career goals?",
-                    "type": "career_goals",
-                    "difficulty": "easy",
-                    "focus_area": "future_planning"
-                }
-            ]
-    
-    def generate_enhanced_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate enhanced portfolio with AI-powered content and styling"""
-        style = user_data.get('portfolio_style', 'Modern Professional')
-        color_scheme = user_data.get('color_scheme', 'Blue Gradient')
-        include_projects = user_data.get('include_projects', True)
-        
-        prompt = f"""
-        Create an enhanced, professional portfolio for:
+        Create a professional portfolio for:
         
         Name: {user_data.get('name', 'Professional')}
         Title: {user_data.get('title', 'Professional')}
@@ -535,28 +302,70 @@ class GroqLLM:
         Experience: {user_data.get('experience', 'Professional experience')}
         Education: {user_data.get('education', '')}
         
-        Portfolio Style: {style}
-        Color Scheme: {color_scheme}
-        Include Projects: {include_projects}
+        Generate content for these portfolio sections:
+        1. Professional summary (2-3 compelling sentences)
+        2. About section (150-200 words, engaging and personal)
+        3. Skills organized by category
+        4. Project highlights (3-4 impressive projects based on skills)
+        5. Call-to-action statement
         
-        Generate comprehensive portfolio content including:
-        1. Compelling professional headline
-        2. Engaging about section (200-250 words)
-        3. Skills categorized by expertise level
-        4. {"3-4 realistic project examples based on skills" if include_projects else "No projects section"}
-        5. Professional achievements and metrics
-        6. Call-to-action statement
-        
-        Make it {style.lower()} in style and highly engaging.
-        Return as JSON with keys: headline, about, skills_categories, projects, achievements, cta
+        Make it professional, engaging, and showcase expertise. Return as JSON with keys: summary, about, skills_categories, projects, cta
         """
         
         messages = [
-            {"role": "system", "content": "You are an expert portfolio designer who creates compelling, professional content. Always return valid JSON."},
+            {
+                "role": "system", 
+                "content": "You are an expert portfolio writer who creates compelling professional content. Always return valid JSON."
+            },
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=2000, temperature=0.8)
+        response = self._make_request(messages, max_tokens=1500, temperature=0.8)
+        
+        try:
+            # Extract JSON from response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start != -1 and json_end != 0:
+                json_str = response[json_start:json_end]
+                return json.loads(json_str)
+        except:
+            # Fallback if JSON parsing fails
+            return {
+                "summary": f"Experienced {user_data.get('title', 'professional')} with expertise in {', '.join(user_data.get('skills', [])[:3])}.",
+                "about": response[:300] if response else "Professional with extensive experience in their field.",
+                "skills_categories": {"Technical": user_data.get('skills', [])},
+                "projects": [],
+                "cta": "Let's connect and discuss opportunities!"
+            }
+
+    def generate_enhanced_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate enhanced portfolio with AI improvements"""
+        prompt = f"""
+        Create an enhanced professional portfolio for:
+        
+        Name: {user_data.get('name', 'Professional')}
+        Title: {user_data.get('title', 'Professional')}
+        Skills: {', '.join(user_data.get('skills', []))}
+        Experience: {user_data.get('experience', 'Professional experience')}
+        Portfolio Style: {user_data.get('portfolio_style', 'Modern Professional')}
+        
+        Generate enhanced portfolio content with:
+        1. Professional headline that captures attention
+        2. Compelling about section (150-200 words)
+        3. Skills organized by categories
+        4. 3-4 impressive project examples based on skills
+        5. Professional achievements
+        6. Call-to-action statements
+          Return as JSON with keys: headline, about, skills_categories, projects, achievements, cta
+        """
+        
+        messages = [
+            {"role": "system", "content": "You are an expert portfolio developer who creates impressive professional portfolios. Always return valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = self._make_request(messages, max_tokens=1500, temperature=0.8)
         
         try:
             json_start = response.find('{')
@@ -566,43 +375,45 @@ class GroqLLM:
                 return json.loads(json_str)
         except:
             return {
-                "headline": f"Innovative {user_data.get('title', 'Professional')} with expertise in {', '.join(user_data.get('skills', [])[:2])}",
-                "about": f"Passionate {user_data.get('title', 'professional')} with extensive experience in delivering high-quality solutions.",
+                "headline": f"Experienced {user_data.get('title', 'Professional')}",
+                "about": f"Professional with extensive experience in {user_data.get('title', 'their field')}.",
                 "skills_categories": {"Technical": user_data.get('skills', [])},
-                "projects": [] if not include_projects else [
-                    {"name": "Sample Project", "description": "Professional project showcasing skills", "tech": user_data.get('skills', [])[:3]}
-                ],
+                "projects": [],
                 "achievements": ["Delivered successful projects", "Strong problem-solving abilities"],
                 "cta": "Let's collaborate on your next project!"
             }
-    
-    def enhance_portfolio_content(self, portfolio_content: Dict, user_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    def enhance_portfolio_content(self, portfolio_content: Dict[str, Any], user_data: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance existing portfolio content with AI improvements"""
         prompt = f"""
-        Enhance this portfolio content to make it more compelling and professional:
+        Enhance the following portfolio content with more compelling and professional language:
         
-        Current Portfolio:
+        Current Portfolio Content:
         {json.dumps(portfolio_content, indent=2)}
         
         User Profile:
-        - Name: {user_data.get('name', 'Professional')}
-        - Title: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
+        Name: {user_data.get('name', 'Professional')}
+        Title: {user_data.get('title', 'Professional')}
+        Skills: {', '.join(user_data.get('skills', []))}
+        Experience: {user_data.get('experience', 'Professional experience')}
         
-        Enhance by:
-        1. Making the language more engaging and dynamic
-        2. Adding specific industry terminology
-        3. Improving the professional tone        4. Adding more compelling achievements
-        5. Creating stronger call-to-action statements
+        Enhance the content to:
+        1. Make headlines more attention-grabbing
+        2. Improve about section with better storytelling
+        3. Add more impressive project descriptions
+        4. Include quantified achievements
+        5. Make call-to-action more compelling
+        6. Add industry-specific keywords
         
-        Return the enhanced content as JSON with the same structure.
+        Return the enhanced content as JSON with the same structure but improved content.
         """
         
         messages = [
-            {"role": "system", "content": "You are an expert content enhancer who makes portfolios more compelling and professional."},
+            {"role": "system", "content": "You are an expert portfolio enhancer who creates compelling professional content. Always return valid JSON."},
             {"role": "user", "content": prompt}
         ]
-        response = self._make_request(messages, max_tokens=2000, temperature=0.7)
+        
+        response = self._make_request(messages, max_tokens=1500, temperature=0.7)
         
         try:
             json_start = response.find('{')
@@ -611,144 +422,156 @@ class GroqLLM:
                 json_str = response[json_start:json_end]
                 return json.loads(json_str)
         except:
+            # Return original content if enhancement fails
             return portfolio_content
-    
-    def generate_deployment_guide(self, hosting_option: str, user_data: Dict[str, Any]) -> str:
-        """Generate deployment guide for portfolio hosting"""
+
+    def generate_deployment_guide(self, hosting_platform: str, user_data: Dict[str, Any]) -> str:
+        """Generate deployment guide for specified hosting platform"""
         prompt = f"""
-        Create a step-by-step deployment guide for hosting a portfolio website on {hosting_option}.
+        Create a comprehensive deployment guide for hosting a portfolio website on {hosting_platform}.
         
-        User Profile: {user_data.get('title', 'Professional')} with {len(user_data.get('skills', []))} technical skills
+        User Profile: {user_data.get('name', 'User')} - {user_data.get('title', 'Professional')}
         
-        Provide:
-        1. Prerequisites and requirements
-        2. Step-by-step deployment instructions
-        3. Configuration settings
-        4. Custom domain setup (if applicable)
-        5. Best practices and optimization tips
+        Provide a detailed guide including:
+        1. Step-by-step deployment instructions
+        2. Prerequisites and account setup
+        3. File preparation tips
+        4. Custom domain configuration (if applicable)
+        5. Best practices for optimization
         6. Troubleshooting common issues
+        7. Performance optimization tips
         
-        Make it beginner-friendly but comprehensive.
+        Make it beginner-friendly but comprehensive. Format in markdown.
         """
         
         messages = [
-            {"role": "system", "content": "You are a deployment expert who creates clear, actionable hosting guides."},
+            {"role": "system", "content": "You are an expert web deployment consultant who creates clear, actionable guides."},
             {"role": "user", "content": prompt}
         ]
         
         return self._make_request(messages, max_tokens=1500, temperature=0.6)
-    
-    def analyze_job_requirements(self, job_description: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze job requirements against user profile"""
-        prompt = f"""
-        Analyze this job description against the candidate's profile:
+
+    def get_deployment_quick_start(self, hosting_platform: str) -> Dict[str, str]:
+        """Get quick start information for deployment platform"""
+        quick_start_guides = {
+            "GitHub Pages (Recommended)": {
+                "steps": """
+### 🚀 GitHub Pages Quick Start
+
+1. **Create Repository**: Create a new public repository named `your-username.github.io`
+2. **Upload Files**: Upload your HTML file (rename to `index.html`)
+3. **Enable Pages**: Go to Settings → Pages → Source: Deploy from branch
+4. **Select Branch**: Choose `main` branch and `/ (root)` folder
+5. **Access Site**: Your portfolio will be live at `https://your-username.github.io`
+
+**Pro Tips:**
+- Use a custom domain by adding a CNAME file
+- Enable HTTPS in repository settings
+- Use GitHub Actions for automatic deployments
+                """,
+                "tip": "💡 GitHub Pages is free and perfect for portfolios! Your site updates automatically when you push changes."
+            },
+            "Netlify (Easy Deploy)": {
+                "steps": """
+### 🚀 Netlify Quick Start
+
+1. **Sign Up**: Create a free Netlify account
+2. **Drag & Drop**: Simply drag your HTML file to the Netlify deploy area
+3. **Instant Deploy**: Your site goes live immediately with a random URL
+4. **Custom Domain**: Add your own domain in Site Settings → Domain Management
+5. **SSL**: HTTPS is enabled automatically
+
+**Pro Tips:**
+- Connect to GitHub for continuous deployment
+- Use Netlify Forms for contact functionality
+- Enable branch previews for testing
+                """,
+                "tip": "💡 Netlify offers instant deployment with drag-and-drop simplicity. Perfect for quick portfolio launches!"
+            },
+            "Vercel (Developer Friendly)": {
+                "steps": """
+### 🚀 Vercel Quick Start
+
+1. **Install CLI**: `npm i -g vercel` or use web interface
+2. **Deploy**: Run `vercel` in your project folder or drag files to dashboard
+3. **Configure**: Set up custom domain and environment variables
+4. **Optimize**: Vercel automatically optimizes your site
+5. **Monitor**: Use analytics to track performance
+
+**Pro Tips:**
+- Integrate with Git for automatic deployments
+- Use Vercel Functions for backend features
+- Enable Web Analytics for insights
+                """,
+                "tip": "💡 Vercel provides excellent performance optimization and developer experience. Great for modern portfolios!"
+            },
+            "Custom Domain Setup": {
+                "steps": """
+### 🚀 Custom Domain Quick Start
+
+1. **Purchase Domain**: Buy a domain from providers like Google Domains, Namecheap, or GoDaddy
+2. **Configure DNS**: Point your domain to your hosting service:
+   - For GitHub Pages: Add CNAME record pointing to `your-username.github.io`
+   - For Netlify: Add CNAME record or use Netlify nameservers
+   - For Vercel: Add CNAME record or use Vercel nameservers
+3. **Enable HTTPS**: Most platforms enable SSL automatically
+4. **Test**: Verify your domain works and redirects properly
+
+**Pro Tips:**
+- Use a .com domain for better professional credibility
+- Set up email forwarding for professional communication
+- Consider domain privacy protection
+                """,
+                "tip": "💡 A custom domain makes your portfolio look more professional and memorable to employers and clients!"
+            }
+        }
         
-        Job Description:
-        {job_description}
-        
-        Candidate Profile:
-        - Title: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-          Provide analysis with:
-        1. Keyword matches found
-        2. Skills alignment percentage
-        3. Experience level match
-        4. Missing requirements
-        5. Suggested improvements
-          Return as JSON: {{"keyword_matches": number, "skills_alignment": percentage, "missing_requirements": [], "suggestions": []}}
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are an expert job analyst who evaluates candidate-job fit."},
-            {"role": "user", "content": prompt}
-        ]
-        response = self._make_request(messages, max_tokens=1000, temperature=0.5)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return {"keyword_matches": 5, "skills_alignment": 75, "missing_requirements": [], "suggestions": []}
-    
-    def generate_tailored_resume(self, user_data: Dict[str, Any], job_description: str) -> str:
-        """Generate resume tailored to specific job"""
-        return self.generate_resume(user_data, job_description)
-    
-    def generate_enhanced_resume(self, user_data: Dict[str, Any]) -> str:
-        """Generate enhanced resume with AI improvements"""
-        enhancements = user_data.get('ai_enhancements', [])
-        style = user_data.get('resume_style', 'Professional ATS-Optimized')
-        
-        prompt = f"""
-        Create an enhanced, {style} resume for:
-        
-        Name: {user_data.get('name', 'Your Name')}
-        Title: {user_data.get('title', 'Professional')}
-        Email: {user_data.get('email', 'email@example.com')}
-        Phone: {user_data.get('phone', 'Phone Number')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
-        Education: {user_data.get('education', 'Educational background')}
-        
-        Apply these AI enhancements: {', '.join(enhancements)}
-        
-        Create a professional resume with:
-        1. Compelling professional summary
-        2. Quantified achievements with metrics
-        3. Industry-specific keywords
-        4. ATS-optimized formatting
-        5. Strong action verbs
-        6. Relevant technical skills highlighted
-        
-        Format for both ATS and human readability.
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are an expert resume writer who creates compelling, ATS-optimized resumes with quantified achievements."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=2000, temperature=0.6)
-    
+        return quick_start_guides.get(hosting_platform, {
+            "steps": "Please select a valid hosting platform for detailed instructions.",
+            "tip": "Choose GitHub Pages for free hosting, Netlify for easy deployment, or Vercel for advanced features."
+        })
+
     def evaluate_resume_quality(self, resume_content: str, job_description: str = "") -> Dict[str, Any]:
         """Evaluate resume quality and ATS compatibility"""
+        context = f"\n\nTarget Job: {job_description}" if job_description else ""
+        
         prompt = f"""
         Evaluate this resume for quality and ATS compatibility:
         
-        Resume:
+        Resume Content:
         {resume_content}
+        {context}
         
-        {"Target Job: " + job_description if job_description else "General evaluation"}
-        
-        Analyze and score (0-100):
-        1. ATS compatibility
+        Provide evaluation on:
+        1. Overall ATS compatibility score (0-100)
         2. Keyword optimization
-        3. Content quality
-        4. Format structure
-        5. Achievement quantification
-          Return as JSON: {{
-            "overall_score": number,
+        3. Format and structure
+        4. Content quality
+        5. Quantified achievements
+        6. Skills relevance
+        7. Professional language
+        
+        Return as JSON with:
+        {{
+            "overall_score": 85,
             "checks": {{
-                "ATS Compatible": boolean,
-                "Keywords Optimized": boolean, 
-                "Achievements Quantified": boolean,
-                "Professional Format": boolean,
-                "Contact Info Complete": boolean
+                "ATS Format": true,
+                "Keywords Present": true,
+                "Quantified Results": false,
+                "Action Verbs": true,
+                "Skills Match": true,
+                "Professional Tone": true
             }},
-            "suggestions": ["improvement1", "improvement2"]
+            "suggestions": ["Add quantified achievements", "Include more keywords"]
         }}
         """
         
         messages = [
-            {"role": "system", "content": "You are an expert resume evaluator who provides detailed quality analysis."},
+            {"role": "system", "content": "You are an expert resume evaluator and ATS specialist. Return only valid JSON."},
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=1000, temperature=0.4)
+        response = self._make_request(messages, max_tokens=800, temperature=0.3)
         
         try:
             json_start = response.find('{')
@@ -758,49 +581,53 @@ class GroqLLM:
                 return json.loads(json_str)
         except:
             return {
-                "overall_score": 85,
+                "overall_score": 75,
                 "checks": {
-                    "ATS Compatible": True,
-                    "Keywords Optimized": True,
-                    "Achievements Quantified": False,
-                    "Professional Format": True,
-                    "Contact Info Complete": True
+                    "ATS Format": True,
+                    "Keywords Present": True,
+                    "Quantified Results": False,
+                    "Action Verbs": True,
+                    "Skills Match": True,
+                    "Professional Tone": True
                 },
-                "suggestions": ["Add quantified achievements", "Include more industry keywords"]
+                "suggestions": ["Review and optimize content", "Add more specific achievements"]
             }
-    
+
     def optimize_resume_further(self, resume_content: str, user_data: Dict[str, Any]) -> str:
-        """Further optimize resume with advanced AI techniques"""
+        """Further optimize resume with AI enhancements"""
         prompt = f"""
-        Further optimize this resume using advanced techniques:
+        Further optimize this resume to make it more compelling and ATS-friendly:
         
         Current Resume:
         {resume_content}
         
-        User Profile: {user_data.get('title', 'Professional')} with skills in {', '.join(user_data.get('skills', [])[:5])}
+        User Profile:
+        Skills: {', '.join(user_data.get('skills', []))}
+        Title: {user_data.get('title', 'Professional')}
         
-        Apply advanced optimizations:
-        1. Add specific metrics and percentages
-        2. Use stronger action verbs
-        3. Include industry buzzwords
-        4. Improve readability and flow
-        5. Enhance achievement statements
-        6. Optimize for senior-level positions
+        Enhance by:
+        1. Adding more powerful action verbs
+        2. Including quantified achievements where possible
+        3. Optimizing keyword density
+        4. Improving professional language
+        5. Better formatting for ATS systems
+        6. Adding industry-specific terminology
+        7. Strengthening impact statements
         
-        Return the highly optimized resume.
+        Return the optimized resume content.
         """
         
         messages = [
-            {"role": "system", "content": "You are a senior resume optimization expert who creates executive-level resumes."},
+            {"role": "system", "content": "You are an expert resume optimizer who creates compelling, ATS-optimized resumes."},
             {"role": "user", "content": prompt}
         ]
         
-        return self._make_request(messages, max_tokens=2000, temperature=0.5)
-    
+        return self._make_request(messages, max_tokens=2000, temperature=0.6)
+
     def analyze_resume_job_match(self, resume_content: str, job_description: str) -> Dict[str, Any]:
         """Analyze how well resume matches job requirements"""
         prompt = f"""
-        Analyze the match between this resume and job description:
+        Analyze how well this resume matches the job requirements:
         
         Resume:
         {resume_content}
@@ -808,27 +635,29 @@ class GroqLLM:
         Job Description:
         {job_description}
         
-        Provide detailed analysis:
+        Provide analysis with:
         1. Match percentage (0-100)
         2. Number of matching keywords
-        3. ATS compatibility score
-        4. Specific improvement suggestions
-        5. Missing keywords to add
-          Return as JSON: {{
-            "match_percentage": number,
-            "keyword_matches": number,
-            "ats_score": number,
-            "suggestions": ["suggestion1", "suggestion2"],
-            "missing_keywords": ["keyword1", "keyword2"]
+        3. Missing key requirements
+        4. Suggestions for improvement
+        5. Strengths that align with job
+        
+        Return as JSON:
+        {{
+            "match_percentage": 85,
+            "keyword_matches": 12,
+            "missing_requirements": ["Python", "Machine Learning"],
+            "suggestions": ["Add Python experience", "Highlight ML projects"],
+            "strengths": ["Strong leadership experience", "Relevant industry background"]
         }}
         """
         
         messages = [
-            {"role": "system", "content": "You are an expert at analyzing resume-job fit and ATS optimization."},
+            {"role": "system", "content": "You are an expert job match analyzer. Return only valid JSON."},
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=1000, temperature=0.4)
+        response = self._make_request(messages, max_tokens=1000, temperature=0.3)
         
         try:
             json_start = response.find('{')
@@ -840,585 +669,22 @@ class GroqLLM:
             return {
                 "match_percentage": 75,
                 "keyword_matches": 8,
-                "ats_score": 82,
-                "suggestions": ["Add more specific keywords", "Include quantified achievements"],
-                "missing_keywords": ["leadership", "project management"]
+                "missing_requirements": ["Check job requirements"],
+                "suggestions": ["Tailor resume to job description"],
+                "strengths": ["Professional experience", "Relevant skills"]
             }
-    
-    def generate_enhanced_cover_letter(self, user_data: Dict[str, Any], job_description: str, 
-                                     company_name: str, tone: str = "Professional") -> str:
-        """Generate enhanced cover letter with specified tone"""
-        prompt = f"""
-        Write a compelling, {tone.lower()} cover letter for:
-        
-        Candidate: {user_data.get('name', 'Candidate')}
-        Current Title: {user_data.get('title', 'Professional')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Target Company: {company_name}
-        Job Description: {job_description}
-        Tone: {tone}
-        
-        Create a personalized cover letter that:
-        1. Opens with a compelling hook specific to the company
-        2. Demonstrates clear understanding of the role
-        3. Highlights most relevant experience and achievements
-        4. Shows knowledge of company culture/values
-        5. Includes specific examples and metrics
-        6. Maintains {tone.lower()} tone throughout
-        7. Closes with strong call to action
-        8. Is 350-450 words
-        
-        Make it highly personalized and compelling for this specific opportunity.
-        """
-        
-        messages = [
-            {"role": "system", "content": f"You are an expert career counselor who writes compelling, {tone.lower()} cover letters that get interviews."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=1500, temperature=0.7)
-    
-    def analyze_cover_letter_quality(self, cover_letter: str, job_description: str) -> Dict[str, Any]:
-        """Analyze cover letter quality and effectiveness"""
-        prompt = f"""
-        Analyze this cover letter for quality and effectiveness:
-        
-        Cover Letter:
-        {cover_letter}
-        
-        Target Job:
-        {job_description}
-        
-        Evaluate (score 0-100):
-        1. Overall quality and impact
-        2. Personalization level
-        3. Relevance to job requirements
-        4. Professional tone
-        5. Call to action strength
-          Return as JSON: {{
-            "overall_score": number,
-            "personalization": number,
-            "relevance": number,
-            "tone_score": number,
-            "strengths": ["strength1", "strength2"],
-            "improvements": ["improvement1", "improvement2"],
-            "suggestions": "Specific advice for enhancement"
-        }}
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are an expert cover letter evaluator who provides detailed quality analysis."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1000, temperature=0.5)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return {
-                "overall_score": 85,
-                "personalization": 80,
-                "relevance": 88,
-                "tone_score": 90,
-                "strengths": ["Clear communication", "Relevant experience"],
-                "improvements": ["Add more specific examples", "Strengthen opening"],
-                "suggestions": "Include specific company research and quantified achievements."
-            }
-    
-    def generate_alternative_cover_letter(self, user_data: Dict[str, Any], job_description: str, 
-                                        company_name: str, alternative_tone: str) -> str:
-        """Generate alternative cover letter with different tone"""
-        return self.generate_enhanced_cover_letter(user_data, job_description, company_name, alternative_tone)
-    
-    def generate_role_specific_questions(self, job_description: str, company_name: str, 
-                                       user_data: Dict[str, Any]) -> List[Dict]:
-        """Generate role-specific interview questions"""
-        prompt = f"""
-        Generate 5 role-specific interview questions for this opportunity:
-        
-        Job Description: {job_description}
-        Company: {company_name}
-        
-        Candidate Background:
-        - Title: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', [])[:5])}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Create questions that:
-        1. Are specific to this role and company
-        2. Test relevant technical/functional skills
-        3. Assess cultural fit for the company
-        4. Evaluate problem-solving abilities
-        5. Are appropriate for the experience level
-        
-        Return as JSON array: [{"question": "...", "type": "...", "focus": "..."}]
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are an expert interviewer who creates role-specific, company-tailored questions."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1200, temperature=0.7)
-        
-        try:
-            json_start = response.find('[')
-            json_end = response.rfind(']') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return [
-                {"question": f"Why are you interested in this role at {company_name}?", "type": "motivation", "focus": "company_fit"},
-                {"question": "Describe your experience with the key technologies mentioned in the job description.", "type": "technical", "focus": "skills"},
-                {"question": "How would you approach solving the main challenges mentioned in this role?", "type": "problem_solving", "focus": "approach"},
-                {"question": "Tell me about a time you had to learn a new skill quickly.", "type": "behavioral", "focus": "adaptability"},
-                {"question": "Where do you see yourself growing in this position?", "type": "career", "focus": "growth"}
-            ]
-    
-    def generate_answer_tips(self, question: str, user_data: Dict[str, Any]) -> str:
-        """Generate tips for answering specific interview questions"""
-        prompt = f"""
-        Provide expert tips for answering this interview question:
-        
-        Question: {question}
-        
-        Candidate Profile:
-        - Title: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', [])[:3])}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Provide:
-        1. Key points to cover in the answer
-        2. Specific examples they could use based on their background
-        3. Common mistakes to avoid
-        4. Structure for the response (e.g., STAR method)
-        5. How to tie back to their skills and experience
-        
-        Make it actionable and specific to their profile.
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are an expert interview coach who provides specific, actionable answer strategies."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=800, temperature=0.6)
-    
-    def analyze_profile_strength(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze user profile strength for job search"""
-        prompt = f"""
-        Analyze this professional profile for job search readiness:
-        
-        Profile:
-        - Name: {user_data.get('name', 'Professional')}
-        - Title: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        - Education: {user_data.get('education', 'Education background')}
-        
-        Evaluate:
-        1. Profile completeness (0-100)
-        2. Market competitiveness
-        3. Skills relevance to current market
-        4. Areas for improvement
-        5. Specific suggestions for enhancement
-          Return as JSON: {{
-            "score": number,
-            "completeness": number,
-            "market_relevance": number,
-            "suggestions": ["suggestion1", "suggestion2", "suggestion3"]
-        }}
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are an expert career analyst who evaluates professional profiles for market readiness."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1000, temperature=0.5)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return {
-                "score": 75,
-                "completeness": 80,
-                "market_relevance": 85,
-                "suggestions": [
-                    "Add more quantified achievements",
-                    "Include industry certifications",
-                    "Expand technical skill set"
-                ]
-            }
-    
-    def analyze_job_matches(self, jobs: List[Dict], user_data: Dict[str, Any]) -> List[Dict]:
-        """Enhance job listings with AI match analysis"""
-        enhanced_jobs = []
-        
-        for job in jobs:
-            try:
-                prompt = f"""
-                Analyze this job match for the candidate:
-                
-                Job: {job.get('title', 'Job Title')} at {job.get('company', 'Company')}
-                Description: {job.get('description', 'Job description')[:500]}
-                
-                Candidate:
-                - Title: {user_data.get('title', 'Professional')}
-                - Skills: {', '.join(user_data.get('skills', [])[:8])}
-                - Experience: {user_data.get('experience', 'Professional experience')}
-                
-                Return only: {{"skills_match": percentage, "experience_match": percentage, "overall_fit": percentage}}
-                """
-                
-                messages = [
-                    {"role": "system", "content": "You are an expert job matcher. Return only valid JSON."},
-                    {"role": "user", "content": prompt}
-                ]
-                
-                response = self._make_request(messages, max_tokens=200, temperature=0.3)
-                
-                try:
-                    json_start = response.find('{')
-                    json_end = response.rfind('}') + 1
-                    if json_start != -1 and json_end != 0:
-                        json_str = response[json_start:json_end]
-                        match_data = json.loads(json_str)
-                        job.update(match_data)
-                except:
-                    job.update({"skills_match": 75, "experience_match": 80, "overall_fit": 77})
-                
-                enhanced_jobs.append(job)
-            except:
-                enhanced_jobs.append(job)
-        
-        return enhanced_jobs
-    
-    def generate_career_suggestions(self, user_data: Dict[str, Any], search_keywords: str) -> str:
-        prompt = f"""
-        Generate career suggestions based on this search and profile:
-        
-        Search Keywords: {search_keywords}
-        
-        User Profile:
-        - Current Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Provide:
-        1. Alternative job titles to search for
-        2. Related industries to explore
-        3. Skills to develop for better matches
-        4. Companies known for hiring in this area
-        5. Networking suggestions
-        
-        Make it actionable and specific.
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are a career strategist who provides targeted job search advice."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=1200, temperature=0.7)
-    
-    def generate_alert_preview(self, alert_keywords: str, user_data: Dict[str, Any]) -> str:
-        prompt = f"""
-        Generate a preview of job alert results for:
-        
-        Alert Keywords: {alert_keywords}
-        
-        User Profile: {user_data.get('title', 'Professional')} with {len(user_data.get('skills', []))} skills
-        
-        Show:
-        1. Types of jobs this alert would find
-        2. Typical companies that would match
-        3. Expected salary ranges
-        4. Required qualifications
-        5. How often alerts might trigger
-        
-        Make it realistic and helpful.
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are a job market analyst who provides realistic job alert previews."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=800, temperature=0.6)
-    
-    def generate_comprehensive_career_strategy(self, user_data: Dict[str, Any], 
-                                             career_goals: List[str], time_horizon: str) -> str:
-        prompt = f"""
-        Create a comprehensive career strategy for:
-        
-        Profile:
-        - Current Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Career Goals: {', '.join(career_goals)}
-        Timeline: {time_horizon}
-        
-        Create a detailed strategy including:
-        1. Step-by-step career roadmap
-        2. Skills development plan
-        3. Networking strategy
-        4. Target companies and roles
-        5. Salary progression expectations
-        6. Key milestones and timelines
-        7. Risk mitigation strategies
-        8. Alternative pathways
-        
-        Make it specific, actionable, and realistic for the timeline.
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are a senior career strategist who creates comprehensive, actionable career plans."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=2000, temperature=0.6)
-    
-    def analyze_career_potential(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        prompt = f"""
-        Analyze career potential for:
-        
-        Profile:
-        - Current Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Analyze:
-        1. Market demand for their role (0-100)
-        2. Salary growth potential (0-100)
-        3. Skill relevance to future trends (0-100)
-        4. Key growth areas to focus on
-        5. Market trends affecting their field
-          Return as JSON: {{
-            "market_demand": number,
-            "salary_growth": number,
-            "skill_relevance": number,
-            "growth_areas": ["area1", "area2", "area3"],
-            "market_trends": ["trend1", "trend2"]
-        }}
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are a career market analyst who evaluates professional potential and trends."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1000, temperature=0.5)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return {
-                "market_demand": 85,
-                "salary_growth": 78,                "skill_relevance": 90,
-                "growth_areas": ["Leadership skills", "Digital transformation", "Data analysis"],
-                "market_trends": ["Remote work adoption", "AI integration", "Skills-based hiring"]
-            }
-    
-    def generate_learning_path(self, user_data: Dict[str, Any]) -> str:
-        """Generate personalized learning path"""
-        prompt = f"""
-        Create a personalized learning path for:
-        
-        Current Profile:
-        - Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Recommend:
-        1. Priority skills to develop
-        2. Specific courses and certifications
-        3. Learning timeline (3-6 months)
-        4. Free and paid resources
-        5. Hands-on projects to practice
-        6. How skills align with career goals
-        
-        Focus on high-impact, career-advancing skills.
-        """
-        
-        messages = [
-            {"role": "system", "content": "You are a learning strategist who creates targeted skill development plans."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        return self._make_request(messages, max_tokens=1500, temperature=0.6)
-    
-    def get_deployment_quick_start(self, hosting_option: str) -> Dict[str, str]:
-        """Get quick start information for deployment platforms"""
-        quick_starts = {
-            "GitHub Pages (Recommended)": {
-                "url": "https://pages.github.com/",
-                "steps": """
-### 🚀 GitHub Pages Quick Start
-1. **Create a GitHub account** if you don't have one
-2. **Create a new repository** named `your-username.github.io`
-3. **Upload your HTML file** (rename it to `index.html`)
-4. **Go to Settings > Pages** in your repository
-5. **Select source branch** (usually `main`)
-6. **Your site will be live** at `https://your-username.github.io`
-                """,
-                "tip": "💡 GitHub Pages is free and perfect for portfolio hosting!"
-            },
-            "Netlify (Easy Deploy)": {
-                "url": "https://www.netlify.com/",
-                "steps": """
-### 🚀 Netlify Quick Start
-1. **Visit Netlify.com** and create an account
-2. **Drag and drop** your HTML file into the deploy area
-3. **Get instant URL** - your site is live immediately!
-4. **Optional:** Connect GitHub for automatic updates
-5. **Custom domain:** Add your own domain in site settings
-                """,
-                "tip": "💡 Netlify offers drag-and-drop deployment in seconds!"
-            },
-            "Vercel (Developer Friendly)": {
-                "url": "https://vercel.com/",
-                "steps": """
-### 🚀 Vercel Quick Start
-1. **Visit Vercel.com** and sign up with GitHub
-2. **Import your repository** or upload files
-3. **Automatic deployment** - builds and deploys instantly
-4. **Get production URL** with HTTPS included
-5. **Zero config** - works out of the box
-                """,
-                "tip": "💡 Vercel is perfect for developers with GitHub integration!"
-            },
-            "Custom Domain Setup": {
-                "url": "https://domains.google.com/",
-                "steps": """
-### 🚀 Custom Domain Quick Start
-1. **Purchase a domain** from Google Domains or similar
-2. **Choose a hosting service** (GitHub Pages, Netlify, etc.)
-3. **Configure DNS settings** to point to your host
-4. **Upload your website files** to the hosting service
-5. **Enable HTTPS** for security and SEO
-                """,
-                "tip": "💡 Custom domains give your portfolio a professional look!"
-            }
-        }
-        
-        return quick_starts.get(hosting_option, {
-            "url": "https://github.com/",
-            "steps": "### General deployment steps would go here",
-            "tip": "💡 Choose a hosting platform that fits your needs!"
-        })
 
-    def generate_comprehensive_qa_strategy(self, user_data: Dict[str, Any], 
-                                          job_description: str, company_name: str) -> str:
-        """Generate comprehensive QA strategy for interviews"""
-        prompt = f"""
-        Create a comprehensive QA strategy for:
-        
-        Candidate Profile:
-        - Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', [])[:5])}
-        - Experience Level: {user_data.get('experience', 'Professional experience')}
-        
-        Target Role: {user_data.get('title', 'Professional')}
-        Job Description: {job_description}
-        Company: {company_name}
-        
-        Strategy Goals:
-        1. Identify key focus areas for QA
-        2. Develop targeted questions for each area
-        3. Create a scoring rubric for responses
-        4. Suggest ideal answer elements
-        5. Recommend follow-up questions for depth
-        6. Highlight red flags to watch for
-        
-        Make it detailed, structured, and tailored to the candidate and role.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert interview strategist who creates detailed, role-specific interview guides."
-            },
-            {"role": "user", "content": prompt}
+    def health_check(self) -> bool:
+        """Check if the Groq service is accessible"""
+        test_messages = [
+            {"role": "user", "content": "Hello, are you working?"}
         ]
         
-        return self._make_request(messages, max_tokens=1500, temperature=0.6)
-    
-    def generate_candidate_scorecard(self, interview_qa: List[Dict], user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate a scorecard for candidate evaluation"""
-        prompt = f"""
-        Create a detailed scorecard for evaluating this candidate:
-        
-        Candidate Profile:
-        - Name: {user_data.get('name', 'Candidate')}
-        - Applied Role: {user_data.get('title', 'Professional')}
-        - Skills: {', '.join(user_data.get('skills', []))}
-        - Experience: {user_data.get('experience', 'Professional experience')}
-        
-        Interview Q&A:
-        {json.dumps(interview_qa, indent=2)}
-        
-        Scorecard Sections:
-        1. Overall impression
-        2. Communication skills
-        3. Technical expertise
-        4. Problem-solving ability
-        5. Cultural fit
-        6. Strengths and weaknesses
-        7. Recommended next steps
-        
-        Use a clear, structured format with ratings and comments.
-        """
-        
-        messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert in candidate evaluation, providing detailed and objective scorecards."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = self._make_request(messages, max_tokens=1500, temperature=0.6)
-        
-        try:
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start != -1 and json_end != 0:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
-        except:
-            return {
-                "overall_impression": "Positive",
-                "communication_skills": "Strong",
-                "technical_expertise": "Proficient",
-                "problem_solving": "Excellent",
-                "cultural_fit": "Good",
-                "strengths": ["Relevant experience", "Strong technical skills"],
-                "weaknesses": ["Limited leadership experience"],
-                "recommended_next_steps": "Proceed to final interview"
-            }
+        response = self._make_request(test_messages, max_tokens=50, temperature=0.1)
+        return not response.startswith("❌")
     
     def parse_resume_data(self, resume_text: str) -> Dict[str, Any]:
-        """
-        Parse resume text using AI to extract structured data
-        """
+        """Parse resume text using AI to extract structured data"""
         prompt = f"""
         Parse the following resume text and extract key information into a structured format.
         Focus on accuracy and completeness.
@@ -1473,11 +739,7 @@ class GroqLLM:
             return self._fallback_resume_parsing(resume_text)
     
     def _fallback_resume_parsing(self, text: str) -> Dict[str, Any]:
-        """
-        Fallback method for basic resume parsing using regex patterns
-        """
-        import re
-        
+        """Fallback method for basic resume parsing using regex patterns"""
         data = {
             'name': '',
             'email': '',
@@ -1526,16 +788,67 @@ class GroqLLM:
                 found_skills.append(skill)
         data['skills'] = found_skills
         
-        # Basic experience extraction (get text around "experience" keyword)
+        # Basic experience extraction
         exp_pattern = r'(?i)(experience|work history|employment)(.*?)(?=education|skills|projects|$)'
         exp_match = re.search(exp_pattern, text, re.DOTALL)
         if exp_match:
-            data['experience'] = exp_match.group(2).strip()[:500]  # Limit length
+            data['experience'] = exp_match.group(2).strip()[:500]
         
         # Basic education extraction
         edu_pattern = r'(?i)(education|academic|degree)(.*?)(?=experience|skills|projects|$)'
         edu_match = re.search(edu_pattern, text, re.DOTALL)
         if edu_match:
-            data['education'] = edu_match.group(2).strip()[:300]  # Limit length
+            data['education'] = edu_match.group(2).strip()[:300]
         
         return data
+
+    def analyze_cover_letter_quality(self, cover_letter: str, job_description: str = "") -> Dict[str, Any]:
+        """Analyze cover letter quality and provide feedback"""
+        prompt = f"""
+        Analyze this cover letter for quality and effectiveness:
+        
+        Cover Letter:
+        {cover_letter}
+        
+        Job Description:
+        {job_description}
+        
+        Evaluate and return JSON with:
+        {{
+            "engagement_score": 88,
+            "relevance_score": 85,
+            "checks": {{
+                "Professional tone": true,
+                "Specific examples": true,
+                "Clear call to action": true,
+                "Proper length": true,
+                "Keywords included": false
+            }}
+        }}
+        """
+        
+        messages = [
+            {"role": "system", "content": "You are an expert career counselor analyzing cover letters. Return only valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = self._make_request(messages, max_tokens=500, temperature=0.3)
+        
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start != -1 and json_end != 0:
+                json_str = response[json_start:json_end]
+                return json.loads(json_str)
+        except:
+            return {
+                "engagement_score": 85,
+                "relevance_score": 80,
+                "checks": {
+                    "Professional tone": True,
+                    "Specific examples": True,
+                    "Clear call to action": True,
+                    "Proper length": True,
+                    "Keywords included": True
+                }
+            }

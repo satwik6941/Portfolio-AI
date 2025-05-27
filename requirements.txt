@@ -11,6 +11,6 @@ selenium
 webdriver-manager
 fpdf2
 schedule
-linkedin-api
-python-linkedin
-linkedin-jobs-scraper
+google-cloud-talent
+google-auth
+googlesearch-python
