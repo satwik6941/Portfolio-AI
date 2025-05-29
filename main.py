@@ -15,7 +15,6 @@ from interview_simulator import InterviewSimulator, InterviewUI
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Try to set Tesseract path, but don't fail if it doesn't exist
 try:
     if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
         pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -116,8 +115,6 @@ def main():
     
     st.title("🚀 AI Career Assistant")
     st.markdown("Transform your career with AI-powered tools for portfolios, resumes, and interview prep!")
-    
-    # Debug: Show that we're initializing services
     with st.spinner("Initializing AI services..."):
         services = initialize_services()
     
@@ -128,15 +125,17 @@ def main():
     groq_service, data_extractor, portfolio_gen, resume_gen, cover_letter_gen, job_searcher, interview_sim = services
     st.success("✅ Services initialized successfully!")
     
+    # Navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Choose a feature:", [
         "📤 Data Input",
+        "💬 Chat with Resume",
         "🌐 Portfolio Generator", 
         "📄 Resume Generator",
         "✉️ Cover Letter Generator",
         "🔍 Job Search",
-        "🎤 Interview Simulator"
-    ])
+        "🎤 Interview Simulator",
+            ])
     
     if "user_data" not in st.session_state:
         st.session_state.user_data = {}
@@ -153,6 +152,75 @@ def main():
         job_search_page(job_searcher, groq_service)
     elif page == "🎤 Interview Simulator":
         interview_page(interview_sim)
+    elif page == "💬 Chat with Resume":
+        resume_chat_page(groq_service)
+
+def resume_chat_page(groq_service):
+    """Chat with Resume page for AI-powered resume assistance"""
+    st.header("💬 Chat with Resume")
+    st.markdown("Ask questions about your resume, get suggestions for improvements, or practice explaining your experience.")
+    
+    if not st.session_state.get("verification_completed", False):
+        st.warning("⚠️ Please complete your profile verification in the Data Input page first.")
+        return
+    
+    if 'resume_chat_messages' not in st.session_state:
+        st.session_state.resume_chat_messages = []
+    
+    if len(st.session_state.resume_chat_messages) == 0:
+        welcome_msg = {
+            "role": "assistant",
+            "content": "Hello! I'm your AI resume assistant. I can help you with:\n\n"
+                        "• Analyzing your resume content\n"
+                        "• Suggesting improvements\n"
+                        "• Helping you explain your experience\n"
+                        "• Answering questions about your background\n\n"
+                        "What would you like to discuss about your resume?"        }
+        st.session_state.resume_chat_messages.append(welcome_msg)
+    for message in st.session_state.resume_chat_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    if prompt := st.chat_input("Ask me anything about your resume..."):
+        st.session_state.resume_chat_messages.append({"role": "user", "content": prompt})
+        
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    user_data = st.session_state.get("user_data", {})
+                    context = f"""
+                    User Profile Information:
+                    Name: {user_data.get('name', 'Not provided')}
+                    Email: {user_data.get('email', 'Not provided')}
+                    Phone: {user_data.get('phone', 'Not provided')}
+                    LinkedIn: {user_data.get('linkedin', 'Not provided')}
+                    Title: {user_data.get('title', 'Not provided')}
+                    
+                    Skills: {', '.join(user_data.get('skills', []))}
+                    
+                    Experience: {user_data.get('experience', 'Not provided')}
+                    
+                    Education: {user_data.get('education', 'Not provided')}
+                    """
+                    chat_history = st.session_state.resume_chat_messages[:-1] if len(st.session_state.resume_chat_messages) > 1 else []
+                    
+                    response = groq_service.chat_about_resume(
+                        resume_content=context,
+                        user_message=prompt,
+                        chat_history=chat_history                    )
+                    
+                    st.markdown(response)
+                    
+                    st.session_state.resume_chat_messages.append({"role": "assistant", "content": response})
+                    
+                except Exception as e:
+                    error_msg = f"Sorry, I encountered an error: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.resume_chat_messages.append({"role": "assistant", "content": error_msg})
+
 
 def data_input_page(data_extractor):
     st.header("📤 Data Input")
@@ -367,19 +435,15 @@ def data_input_page(data_extractor):
                 st.session_state.extracted_data = {}
                 st.rerun()
         
-        # Resume Chat Section
         st.subheader("💬 Chat About Your Resume")
         st.markdown("Get AI-powered insights, suggestions, and answers about your resume!")
-        
-        # Initialize chat history if not exists
+
         if "resume_chat_history" not in st.session_state:
             st.session_state.resume_chat_history = []
         
-        # Chat container
         chat_container = st.container()
         
         with chat_container:
-            # Display chat history
             for i, message in enumerate(st.session_state.resume_chat_history):
                 if message["role"] == "user":
                     st.markdown(f"""
@@ -393,8 +457,7 @@ def data_input_page(data_extractor):
                         <strong>AI Career Coach:</strong> {message["content"]}
                     </div>
                     """, unsafe_allow_html=True)
-        
-        # Chat input
+
         col_chat, col_send = st.columns([4, 1])
         with col_chat:
             user_question = st.text_input(
@@ -405,7 +468,6 @@ def data_input_page(data_extractor):
         with col_send:
             send_message = st.button("Send 📤", key="send_resume_chat")
         
-        # Quick question buttons
         st.markdown("**Quick Questions:**")
         col_q1, col_q2, col_q3 = st.columns(3)
         with col_q1:
@@ -421,20 +483,16 @@ def data_input_page(data_extractor):
                 user_question = "What career opportunities align with my skills and experience?"
                 send_message = True
         
-        # Process chat message
         if (send_message or user_question) and user_question.strip():
             with st.spinner("🤖 AI is analyzing your resume and preparing a response..."):
                 try:
-                    # Get the groq service
                     groq_service = initialize_services()[0]
                     
                     if groq_service:
-                        # Get resume content from extracted data
                         resume_content = ""
                         if 'cv_text' in st.session_state.user_data:
                             resume_content = st.session_state.user_data['cv_text']
                         else:
-                            # Build resume content from extracted data
                             resume_content = f"""
                             Name: {st.session_state.user_data.get('name', '')}
                             Email: {st.session_state.user_data.get('email', '')}
@@ -451,14 +509,12 @@ def data_input_page(data_extractor):
                             {st.session_state.user_data.get('experience', '')}
                             """
                         
-                        # Get AI response
                         ai_response = groq_service.chat_about_resume(
                             resume_content=resume_content,
                             user_message=user_question,
                             chat_history=st.session_state.resume_chat_history
                         )
                         
-                        # Add to chat history
                         st.session_state.resume_chat_history.append({
                             "role": "user",
                             "content": user_question
@@ -468,7 +524,6 @@ def data_input_page(data_extractor):
                             "content": ai_response
                         })
                         
-                        # Clear input and rerun to show new messages
                         st.rerun()
                         
                     else:
@@ -477,7 +532,6 @@ def data_input_page(data_extractor):
                 except Exception as e:
                     st.error(f"❌ Error processing your question: {str(e)}")
         
-        # Clear chat history button
         if st.session_state.resume_chat_history:
             if st.button("🗑️ Clear Chat History", key="clear_chat"):
                 st.session_state.resume_chat_history = []
@@ -706,8 +760,7 @@ def portfolio_page(groq_service, portfolio_gen):
             st.components.v1.html(html_content, height=600, scrolling=True)
             
             col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
+            with col1:                st.download_button(
                     label="📥 Download HTML",
                     data=html_content,
                     file_name=f"portfolio_{template_data.get('name', 'portfolio').replace(' ', '_').lower()}.html",
@@ -720,65 +773,6 @@ def portfolio_page(groq_service, portfolio_gen):
                     st.session_state.portfolio_html = None
                     st.session_state.portfolio_template_data = None
                     st.rerun()
-            
-            st.subheader("🌐 AI-Powered Deployment Options")
-            hosting_option = st.selectbox("Choose hosting platform:", [
-                "GitHub Pages (Recommended)",
-                "Netlify (Easy Deploy)", 
-                "Vercel (Developer Friendly)",
-                "Custom Domain Setup"
-            ])
-            
-            deployment_urls = {
-                "GitHub Pages (Recommended)": "https://pages.github.com/",
-                "Netlify (Easy Deploy)": "https://www.netlify.com/",
-                "Vercel (Developer Friendly)": "https://vercel.com/",
-                "Custom Domain Setup": "https://domains.google.com/"
-            }
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("🚀 Get AI Deployment Guide", use_container_width=True):
-                    deployment_tips = groq_service.generate_deployment_guide(hosting_option, st.session_state.user_data)
-                    st.markdown("### 📖 AI-Generated Deployment Guide")
-                    st.markdown(deployment_tips)
-                    
-                    quick_start = groq_service.get_deployment_quick_start(hosting_option)
-                    st.markdown("### ⚡ Quick Start Guide")
-                    st.markdown(quick_start["steps"])
-                    st.info(quick_start["tip"])
-                    st.success(f"✅ Ready to deploy to {hosting_option}!")
-            
-            with col2:
-                deployment_url = deployment_urls.get(hosting_option, "https://github.com/")
-                
-                if st.button(f"🌐 Go to {hosting_option.split(' ')[0]} & Download HTML", use_container_width=True, type="primary"):
-                    if 'portfolio_html' in st.session_state:
-                        st.download_button(
-                            label="💾 Your Portfolio HTML",
-                            data=st.session_state.portfolio_html,
-                            file_name=f"{st.session_state.user_data.get('name', 'portfolio').lower().replace(' ', '_')}_portfolio.html",
-                            mime="text/html",
-                            use_container_width=True
-                        )
-                        st.markdown(f"""
-                        <script>
-                            window.open('{deployment_url}', '_blank');
-                        </script>
-                        """, unsafe_allow_html=True)
-                        st.success(f"🚀 HTML downloaded! Opening {hosting_option.split(' ')[0]}...")
-                    else:
-                        st.error("⚠️ Please generate your portfolio first!")
-                
-                if "GitHub" in hosting_option:
-                    st.info("💡 **Tip:** Create a new repository and upload your HTML file to get started!")
-                elif "Netlify" in hosting_option:
-                    st.info("💡 **Tip:** Drag and drop your HTML file directly to deploy instantly!")
-                elif "Vercel" in hosting_option:
-                    st.info("💡 **Tip:** Connect your GitHub repository for automatic deployments!")
-                else:
-                    st.info("💡 **Tip:** Purchase a custom domain and point it to your hosting service!")
             
         except Exception as e:
             st.error(f"❌ Error generating portfolio: {str(e)}")
@@ -803,15 +797,11 @@ def resume_page(groq_service, resume_gen):
         help="List all your relevant skills, technologies, certifications, and experience. The AI will use this to generate your resume."
     )
     
-    # Projects Management Section
     st.markdown("### 🚀 Project Management")
     st.info("Add your projects to enhance your resume. AI will format them using the STAR method (Situation, Task, Action, Result).")
     
-    # Initialize projects in session state
     if 'resume_projects' not in st.session_state:
         st.session_state.resume_projects = []
-    
-    # Project input form
     with st.expander("➕ Add New Project", expanded=False):
         with st.form("project_form"):
             project_title = st.text_input("🏗️ Project Title:", placeholder="e.g., E-commerce Website Development")
@@ -819,28 +809,27 @@ def resume_page(groq_service, resume_gen):
                 "📝 Project Description:", 
                 height=100,
                 placeholder="Describe your project, your role, challenges faced, and outcomes achieved...\n\nExample:\nDeveloped a full-stack e-commerce website for a local business. Led a team of 3 developers, implemented secure payment processing, and deployed using AWS. Resulted in 40% increase in online sales."
-            )
-            
-            col_tech, col_duration = st.columns(2)
+            )            
+            col_tech, col_duration, col_progress = st.columns(3)
             with col_tech:
                 technologies = st.text_input("🛠️ Technologies Used:", placeholder="React, Node.js, MongoDB, AWS")
             with col_duration:
                 duration = st.text_input("⏱️ Duration:", placeholder="3 months, Jan-Mar 2024")
+            with col_progress:
+                still_working = st.checkbox("Still Work in Progress?", key="project_progress")
             
             submit_project = st.form_submit_button("➕ Add Project", type="primary")
-            
             if submit_project and project_title and project_description:
                 new_project = {
                     'title': project_title,
                     'description': project_description,
                     'technologies': technologies,
-                    'duration': duration
+                    'duration': duration if not still_working else "Ongoing",
+                    'still_working': still_working
                 }
                 st.session_state.resume_projects.append(new_project)
                 st.success(f"✅ Project '{project_title}' added successfully!")
                 st.rerun()
-    
-    # Display existing projects
     if st.session_state.resume_projects:
         st.markdown("**📋 Your Projects:**")
         for i, project in enumerate(st.session_state.resume_projects):
@@ -848,6 +837,8 @@ def resume_page(groq_service, resume_gen):
                 col_project, col_remove = st.columns([4, 1])
                 with col_project:
                     st.markdown(f"**{project['title']}**")
+                    if project.get('still_working'):
+                        st.write("🚧 Work in Progress")
                     st.write(f"📝 {project['description'][:100]}...")
                     if project['technologies']:
                         st.write(f"🛠️ Technologies: {project['technologies']}")
@@ -885,7 +876,7 @@ def resume_page(groq_service, resume_gen):
         if user_skills:
             skills_count = len([skill.strip() for skill in user_skills.replace('\n', ',').split(',') if skill.strip()])
             st.write(f"🛠️ **Skills Entered:** {skills_count}")
-          # Display project count
+
         if hasattr(st.session_state, 'resume_projects') and st.session_state.resume_projects:
             project_count = len(st.session_state.resume_projects)
             st.write(f"🚀 **Projects Added:** {project_count}")
@@ -1083,7 +1074,6 @@ def cover_letter_page(groq_service, cover_letter_gen):
             use_container_width=True
         )
         
-        # Add clear content button
         if st.button("🗑️ Clear Generated Cover Letter"):
             st.session_state.cover_letter_content = None
             st.session_state.cover_letter_generated_data = {}
@@ -1112,8 +1102,7 @@ def job_search_page(job_searcher, groq_service):
             3. Add this environment variable to your .env file:
                 - `JOBS_API_KEY=your_google_cloud_api_key`
             4. Restart the application
-            
-            **Note:** The app works great without the API using our enhanced search with realistic job data!
+              **Note:** The app works great without the API using our enhanced search with realistic job data!
             """)
     
     st.markdown("### 🔍 Job Search")
@@ -1127,6 +1116,12 @@ def job_search_page(job_searcher, groq_service):
             
             col_a, col_b = st.columns(2)
             with col_a:
+                job_type = st.selectbox("Job Type:", [
+                    "Full-time Jobs",
+                    "Internships",
+                    "Both Jobs & Internships"
+                ])
+                
                 experience_level = st.selectbox("Experience Level:", [
                     "", 
                     "Entry Level (0-2 years)", 
@@ -1192,6 +1187,7 @@ def job_search_page(job_searcher, groq_service):
                 experience_level=experience_level,
                 company_size=company_size,
                 remote=remote_work,
+                job_type=job_type,
                 limit=25
             )
             
@@ -1248,16 +1244,15 @@ def job_search_page(job_searcher, groq_service):
                             st.markdown("**🤖 AI Analysis:**")
                             st.info(f"Match Level: {analysis.get('match_level', 'N/A')} | Keywords: {', '.join(analysis.get('matched_keywords', [])[:3])}")
                     
-                    with col2:
-                        # Action buttons
+                    with col2:                        
+                        platform_name = job.get('application_platform', 'LinkedIn')
+                        platform_icon = job.get('platform_icon', '💼')
+                        
                         if job.get('linkedin_url'):
-                            st.link_button("🔗 View on LinkedIn", job['linkedin_url'], use_container_width=True)
+                            st.link_button("💼 View on LinkedIn", job['linkedin_url'], use_container_width=True)
                         
                         if job.get('application_url'):
-                            st.link_button("🚀 Apply Now", job['application_url'], use_container_width=True)
-                            
-                        if st.button(f"📝 Generate Cover Letter", key=f"cover_{i}"):
-                            st.info("📝 Navigate to Cover Letter Generator to create a tailored letter for this role!")
+                            st.link_button(f"{platform_icon} Apply on {platform_name}", job['application_url'], use_container_width=True)
                         
                         if st.button(f"💾 Save Job", key=f"save_{i}"):
                             if 'saved_jobs' not in st.session_state:
@@ -1679,7 +1674,6 @@ def generate_report_text(report, session):
     return "\n".join(lines)
 
 def render_chat_interview_setup(interview_sim):
-    """Setup for chat-based interview mode"""
     st.subheader("💬 Chat Interview Setup")
     st.markdown("Configure your conversational AI interview session:")
     
@@ -1728,7 +1722,6 @@ def render_chat_interview_setup(interview_sim):
     
     if st.button("🚀 Start Chat Interview", type="primary", use_container_width=True):
         if job_title:
-            # Store interview configuration
             st.session_state.interview_job_info = {
                 'job_title': job_title,
                 'company': company,
@@ -1739,21 +1732,28 @@ def render_chat_interview_setup(interview_sim):
                 'difficulty': difficulty
             }
             
-            # Initialize chat interview session
             st.session_state.chat_interview_messages = []
             st.session_state.chat_interview_active = True
             st.session_state.current_question_num = 0
             st.session_state.interview_answers = []
-            st.session_state.interview_scores = []
-            
-            # Generate first question
+            st.session_state.interview_scores = []          
             user_background = st.session_state.get('user_data', {})
-            first_question = interview_sim.groq_service.generate_interview_questions(
-                st.session_state.interview_job_info['job_description'], 
-                user_background
-            )[0]
+            try:
+                questions = interview_sim.groq_service.generate_interview_questions(
+                    st.session_state.interview_job_info['job_description'], 
+                    user_background,
+                    num_questions=num_questions
+                )
+                if not questions or len(questions) == 0:
+                    st.error("❌ Failed to generate interview questions. Please try again.")
+                    return
+                
+                st.session_state.interview_questions = questions
+                first_question = questions[0]
+            except Exception as e:
+                st.error(f"❌ Error generating interview questions: {str(e)}")
+                return
             
-            # Add welcome message and first question
             welcome_msg = f"Welcome to your {interview_type} interview for {job_title}"
             if company:
                 welcome_msg += f" at {company}"
@@ -1770,41 +1770,33 @@ def render_chat_interview_setup(interview_sim):
             st.error("Please provide at least a job title to start the interview.")
 
 def render_chat_interview(interview_sim):
-    """Active chat-based interview interface"""
     st.subheader("💬 Live Interview Chat")
     
     job_info = st.session_state.interview_job_info
     progress = st.session_state.current_question_num / job_info['num_questions']
     st.progress(progress, text=f"Question {st.session_state.current_question_num + 1} of {job_info['num_questions']}")
     
-    # Display chat messages
     for message in st.session_state.chat_interview_messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
     
-    # User input for answers
     if prompt := st.chat_input("Type your answer here..."):
-        # Add user message to chat
         st.session_state.chat_interview_messages.append({"role": "user", "content": prompt})
-        
         with st.chat_message("user"):
             st.write(prompt)
         
-        # Process the answer
         with st.chat_message("assistant"):
             with st.spinner("Analyzing your answer..."):
-                # Evaluate the answer
+                user_data = st.session_state.get('user_data', {})
                 evaluation = interview_sim.groq_service.evaluate_interview_answer(
                     st.session_state.current_question['question'],
                     prompt,
-                    job_info['job_description']
+                    user_data
                 )
                 
-                # Store answer and score
                 st.session_state.interview_answers.append(prompt)
                 st.session_state.interview_scores.append(evaluation.get('score', 5))
                 
-                # Generate feedback message
                 score = evaluation.get('score', 5)
                 feedback_msg = f"**Score: {score}/10**\n\n"
                 
@@ -1822,34 +1814,45 @@ def render_chat_interview(interview_sim):
                 
                 st.write(feedback_msg)
                 st.session_state.chat_interview_messages.append({"role": "assistant", "content": feedback_msg})
-                
-                # Move to next question or end interview
                 st.session_state.current_question_num += 1
                 
                 if st.session_state.current_question_num < job_info['num_questions']:
-                    # Generate next question
-                    user_background = st.session_state.get('user_data', {})
-                    questions = interview_sim.groq_service.generate_interview_questions(
-                        job_info['job_description'], 
-                        user_background
-                    )
+                    if 'interview_questions' not in st.session_state:
+                        user_background = st.session_state.get('user_data', {})
+                        try:
+                            all_questions = interview_sim.groq_service.generate_interview_questions(
+                                job_info['job_description'], 
+                                user_background,
+                                num_questions=job_info['num_questions']
+                            )
+                            st.session_state.interview_questions = all_questions
+                        except Exception as e:
+                            st.error(f"❌ Error generating next question: {str(e)}")
+                            st.session_state.chat_interview_active = False
+                            st.session_state.interview_complete = True
+                            st.rerun()
+                            return
                     
-                    if st.session_state.current_question_num < len(questions):
-                        next_question = questions[st.session_state.current_question_num]
+                    if st.session_state.current_question_num < len(st.session_state.interview_questions):
+                        next_question = st.session_state.interview_questions[st.session_state.current_question_num]
                         st.session_state.current_question = next_question
                         
                         next_q_msg = f"**Question {st.session_state.current_question_num + 1}:** {next_question['question']}"
                         st.write(next_q_msg)
                         st.session_state.chat_interview_messages.append({"role": "assistant", "content": next_q_msg})
+                    else:
+                        completion_msg = "🎉 **Interview Complete!** Thank you for your responses. Let me prepare your results..."
+                        st.write(completion_msg)
+                        st.session_state.chat_interview_messages.append({"role": "assistant", "content": completion_msg})
+                        st.session_state.chat_interview_active = False
+                        st.session_state.interview_complete = True
                 else:
-                    # Interview complete
                     completion_msg = "🎉 **Interview Complete!** Thank you for your responses. Let me prepare your results..."
                     st.write(completion_msg)
                     st.session_state.chat_interview_messages.append({"role": "assistant", "content": completion_msg})
                     st.session_state.chat_interview_active = False
                     st.session_state.interview_complete = True
                     
-                    # Generate final report
                     avg_score = sum(st.session_state.interview_scores) / len(st.session_state.interview_scores)
                     st.session_state.final_interview_report = {
                         'overall_score': round(avg_score, 1),
@@ -1861,12 +1864,10 @@ def render_chat_interview(interview_sim):
         
         st.rerun()
     
-    # Option to end interview early
     if st.button("🛑 End Interview Early", type="secondary"):
         st.session_state.chat_interview_active = False
         st.session_state.interview_complete = True
         
-        # Generate final report with current answers
         if st.session_state.interview_scores:
             avg_score = sum(st.session_state.interview_scores) / len(st.session_state.interview_scores)
             st.session_state.final_interview_report = {
@@ -1879,7 +1880,6 @@ def render_chat_interview(interview_sim):
         st.rerun()
 
 def render_chat_interview_results(interview_sim):
-    """Display chat interview results and feedback"""
     st.subheader("🎉 Interview Results")
     
     if 'final_interview_report' not in st.session_state:
@@ -1889,7 +1889,14 @@ def render_chat_interview_results(interview_sim):
     report = st.session_state.final_interview_report
     job_info = report['job_info']
     
-    # Display overall results
+    if 'final_interview_report' in st.session_state:
+        session = {
+            'questions': [{'question': q} for q in st.session_state.get('interview_questions', [])],
+            'answers': st.session_state.get('interview_answers', [])
+        }
+    else:
+        session = {'questions': [], 'answers': []}
+    
     st.balloons()
     
     score = report['overall_score']
@@ -1906,7 +1913,6 @@ def render_chat_interview_results(interview_sim):
         st.error(f"💪 Keep Practicing! Overall Score: {score}/10")
         performance_level = "Needs Improvement"
     
-    # Metrics
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1914,8 +1920,6 @@ def render_chat_interview_results(interview_sim):
     
     with col2:
         st.metric("Questions Answered", report['questions_answered'])
-    
-    # Interview summary
     st.markdown("---")
     st.subheader("📊 Interview Summary")
     
@@ -1931,37 +1935,25 @@ def render_chat_interview_results(interview_sim):
         st.write(f"**Difficulty:** {job_info['difficulty']}")
         st.write(f"**Total Questions:** {job_info['num_questions']}")
     
-    # Detailed feedback
     if st.checkbox("📝 Show Detailed Question-by-Question Feedback"):
         st.markdown("---")
         for i, (answer, score) in enumerate(zip(report['answers'], report['scores'])):
             with st.expander(f"Question {i + 1} - Score: {score}/10"):
-                question = session['questions'][i]['question']
-                answer = session['answers'][i]
-                
-                st.markdown(f"**❓ Question:** {question}")
-                st.markdown(f"**💬 Your Answer:** {answer}")
-                
-                if feedback.get('feedback'):
-                    st.markdown(f"**🤖 AI Feedback:** {feedback['feedback']}")
-                
-                if feedback.get('strengths'):
-                    st.markdown("**✅ Strengths:**")
-                    for strength in feedback['strengths']:
-                        st.write(f"• {strength}")
-                
-                if feedback.get('weaknesses'):
-                    st.markdown("**📈 Improvement Areas:**")
-                    for weakness in feedback['weaknesses']:
-                        st.write(f"• {weakness}")
+                if i < len(session['questions']):
+                    question = session['questions'][i]['question']
+                    answer = session['answers'][i]
+                    
+                    st.markdown(f"**❓ Question:** {question}")
+                    st.markdown(f"**💬 Your Answer:** {answer}")
+                    st.markdown(f"**🎯 Score:** {score}/10")
+                    
+                    st.info("💡 For detailed feedback on individual answers, consider running a full analysis.")
     
-    # Action buttons
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     
     with col1:
         if st.button("🔄 Practice Again", type="primary", use_container_width=True):
-            # Reset interview state
             keys_to_clear = [
                 'chat_interview_active', 'interview_complete', 'chat_interview_messages',
                 'current_question_num', 'interview_answers', 'interview_scores',
@@ -1981,7 +1973,8 @@ def render_chat_interview_results(interview_sim):
                         st.write(f"{role_icon} **{msg['role'].title()}:** {msg['content']}")
     
     with col3:
-        # Generate downloadable report
+        completion_rate = (report['questions_answered'] / job_info['num_questions']) * 100
+        
         report_text = f"""INTERVIEW PERFORMANCE REPORT
 ========================================
 Position: {job_info['job_title']}

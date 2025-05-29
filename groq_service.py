@@ -216,8 +216,7 @@ class GroqLLM:
         Apply these AI enhancements: {', '.join(enhancements)}
         {search_context}
         {projects_context}
-        
-        Create a professional resume with:
+          Create a professional resume with:
         1. Compelling professional summary using current industry terminology
         2. Quantified achievements with metrics
         3. Industry-specific keywords (informed by research above)
@@ -226,12 +225,21 @@ class GroqLLM:
         6. Relevant technical skills highlighted with proper context
         7. Current industry trends and terminology integration
         8. Projects section formatted using STAR method (Situation, Task, Action, Result) - analyze each project description and reformat to highlight the situation faced, tasks undertaken, actions taken, and measurable results achieved
+          FORMATTING REQUIREMENTS:
+        - Use **BOLD** formatting for ALL section headers (e.g., **PROFESSIONAL SUMMARY**, **CORE COMPETENCIES**, **PROFESSIONAL EXPERIENCE**, **PROJECTS**, **EDUCATION**)
+        - Use **BOLD** formatting for job titles, company names, project titles, and degree titles
+        - Use **BOLD** formatting for key achievement metrics and important skills
+        - Section headers should be in ALL CAPS and bold: **SECTION NAME**
         
-        IMPORTANT: For each project, transform the raw description into STAR format:
-        - Situation: What was the context or challenge?
-        - Task: What needed to be accomplished?
-        - Action: What specific actions did you take?
-        - Result: What measurable outcomes were achieved?
+        IMPORTANT PROJECTS FORMATTING:
+        For each project, transform the raw description into STAR format where ONLY the project title is bold:
+        - **Project Name**: Description using STAR method
+        - Situation: What was the context or challenge? (NOT bold)
+        - Task: What needed to be accomplished? (NOT bold)
+        - Action: What specific actions did you take? (NOT bold)
+        - Result: What measurable outcomes were achieved? (NOT bold)
+        
+        Do NOT make the words "Situation:", "Task:", "Action:", "Result:" bold. Only the project title should be bold.
         
         Format for both ATS and human readability, ensuring technical terms are used correctly.
         """
@@ -289,22 +297,30 @@ class GroqLLM:
         Education: {user_data.get('education', 'Educational background')}
         {tailoring_context}
         {projects_context}
-        
-        Create a professional, ATS-friendly resume with:
+          Create a professional, ATS-friendly resume with:
         1. Contact information
         2. Professional summary (3-4 lines)
         3. Core competencies/skills
         4. Professional experience with bullet points
         5. Projects section (if projects provided) - Format each project using STAR method
         6. Education
-        7. Use action verbs and quantify achievements where possible
-        8. Include relevant keywords for ATS optimization
+        7. Use action verbs and quantify achievements where possible        8. Include relevant keywords for ATS optimization
         
-        IMPORTANT: If projects are provided, create a dedicated "PROJECTS" section and format each project using the STAR method:
-        - Situation: What was the context or challenge?
-        - Task: What needed to be accomplished?
-        - Action: What specific actions did you take?
-        - Result: What measurable outcomes were achieved?
+        FORMATTING REQUIREMENTS:
+        - Use **BOLD** formatting for ALL section headers (e.g., **PROFESSIONAL SUMMARY**, **CORE COMPETENCIES**, **PROFESSIONAL EXPERIENCE**, **PROJECTS**, **EDUCATION**)
+        - Use **BOLD** formatting for job titles, company names, project titles, and degree titles
+        - Use **BOLD** formatting for key achievement metrics and important skills
+        - Section headers should be in ALL CAPS and bold: **SECTION NAME**
+        
+        IMPORTANT PROJECTS FORMATTING:
+        If projects are provided, create a dedicated "PROJECTS" section and format each project using the STAR method where ONLY the project title is bold:
+        - **Project Name**: Description using STAR method
+        - Situation: What was the context or challenge? (NOT bold)
+        - Task: What needed to be accomplished? (NOT bold)
+        - Action: What specific actions did you take? (NOT bold)
+        - Result: What measurable outcomes were achieved? (NOT bold)
+        
+        Do NOT make the words "Situation:", "Task:", "Action:", "Result:" bold. Only the project title should be bold.
         
         Transform the raw project descriptions into compelling STAR-formatted entries that showcase impact and achievements.
         
@@ -322,6 +338,16 @@ class GroqLLM:
         return self._make_request(messages, max_tokens=2000, temperature=0.6)
 
     def generate_interview_questions(self, job_description: str, user_data: Dict[str, Any], num_questions: int = 5) -> List[Dict]:
+        # Safely extract user data with defaults
+        name = str(user_data.get('name', 'Candidate'))
+        title = str(user_data.get('title', 'Professional'))
+        skills = user_data.get('skills', [])
+        if isinstance(skills, list):
+            skills_str = ', '.join(str(skill) for skill in skills)
+        else:
+            skills_str = str(skills) if skills else 'Various skills'
+        experience = str(user_data.get('experience', 'Professional experience'))
+        
         prompt = f"""
         Generate {num_questions} interview questions for this position:
         
@@ -329,10 +355,10 @@ class GroqLLM:
         {job_description}
         
         Candidate Profile:
-        Name: {user_data.get('name', 'Candidate')}
-        Title: {user_data.get('title', 'Professional')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
+        Name: {name}
+        Title: {title}
+        Skills: {skills_str}
+        Experience: {experience}
         
         Create a mix of:
         1. Behavioral questions (STAR method)
@@ -342,12 +368,12 @@ class GroqLLM:
         
         Return as JSON array:
         [
-            {
+            {{
                 "question": "Tell me about yourself",
                 "type": "General",
                 "difficulty": "Easy",
                 "category": "Introduction"
-            },
+            }},
             ...
         ]
         """
@@ -357,38 +383,53 @@ class GroqLLM:
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=1500, temperature=0.7)
-        
         try:
+            response = self._make_request(messages, max_tokens=1500, temperature=0.7)
+            
             json_start = response.find('[')
             json_end = response.rfind(']') + 1
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 questions = json.loads(json_str)
                 return questions if isinstance(questions, list) else []
-        except:
-            return [
-                {"question": "Tell me about yourself and your background.", "type": "General", "difficulty": "Easy", "category": "Introduction"},
-                {"question": "Why are you interested in this position?", "type": "Behavioral", "difficulty": "Easy", "category": "Motivation"},
-                {"question": "Describe a challenging project you worked on and how you handled it.", "type": "Behavioral", "difficulty": "Medium", "category": "Problem Solving"},
-                {"question": "What are your greatest strengths and how do they apply to this role?", "type": "General", "difficulty": "Medium", "category": "Self Assessment"},
-                {"question": "Where do you see yourself in 5 years?", "type": "General", "difficulty": "Medium", "category": "Career Goals"}
-            ]
+        except Exception as e:
+            print(f"Error generating interview questions: {e}")
+          # Fallback questions
+        return [
+            {"question": "Tell me about yourself and your background.", "type": "General", "difficulty": "Easy", "category": "Introduction"},
+            {"question": "Why are you interested in this position?", "type": "Behavioral", "difficulty": "Easy", "category": "Motivation"},
+            {"question": "Describe a challenging project you worked on and how you handled it.", "type": "Behavioral", "difficulty": "Medium", "category": "Problem Solving"},
+            {"question": "What are your greatest strengths and how do they apply to this role?", "type": "General", "difficulty": "Medium", "category": "Self Assessment"},
+            {"question": "Where do you see yourself in 5 years?", "type": "General", "difficulty": "Medium", "category": "Career Goals"}
+        ]
 
     def generate_interview_question(self, user_data: Dict[str, Any], job_description: str = "") -> str:
         questions = self.generate_interview_questions(job_description, user_data, 1)
         return questions[0]['question'] if questions else "Tell me about your experience and background."
 
     def evaluate_interview_answer(self, question: str, answer: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        # Safely extract user data with defaults
+        skills = user_data.get('skills', [])
+        if isinstance(skills, list):
+            skills_str = ', '.join(str(skill) for skill in skills)
+        else:
+            skills_str = str(skills) if skills else 'Not specified'
+        
+        experience = str(user_data.get('experience', 'Professional experience'))
+        
+        # Escape any problematic characters in the strings
+        question_safe = str(question).replace('{', '{{').replace('}', '}}')
+        answer_safe = str(answer).replace('{', '{{').replace('}', '}}')
+        
         prompt = f"""
         Evaluate this interview answer:
         
-        Question: {question}
-        Answer: {answer}
+        Question: {question_safe}
+        Answer: {answer_safe}
         
         Candidate Profile:
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
+        Skills: {skills_str}
+        Experience: {experience}
         
         Provide evaluation with:
         1. Score (1-10)
@@ -397,13 +438,13 @@ class GroqLLM:
         4. Specific suggestions
         
         Return as JSON:
-        {
+        {{
             "score": 7,
             "strengths": ["Clear communication", "Relevant example"],
             "weaknesses": ["Could be more specific", "Missing quantified results"],
             "suggestions": "Try to include specific metrics and outcomes in your examples.",
             "feedback": "Good response overall, but could be enhanced with more concrete details."
-        }
+        }}
         """
         
         messages = [
@@ -411,32 +452,43 @@ class GroqLLM:
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=800, temperature=0.6)
-        
         try:
+            response = self._make_request(messages, max_tokens=800, temperature=0.6)
+            
             json_start = response.find('{')
             json_end = response.rfind('}') + 1
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 return json.loads(json_str)
-        except:
-            return {
-                "score": 7,
-                "strengths": ["Good effort"],
-                "weaknesses": ["Could provide more detail"],
-                "suggestions": "Consider using the STAR method for behavioral questions.",
-                "feedback": "Thank you for your response. Consider adding more specific examples."
-            }
+        except Exception as e:
+            print(f"Error in evaluate_interview_answer: {e}")
+        
+        # Fallback response
+        return {
+            "score": 7,
+            "strengths": ["Good effort"],
+            "weaknesses": ["Could provide more detail"],
+            "suggestions": "Consider using the STAR method for behavioral questions.",
+            "feedback": "Thank you for your response. Consider adding more specific examples."
+        }
 
     def generate_chat_interview_question(self, context: str, user_data: Dict[str, Any], question_number: int) -> str:
+        # Safely extract user data
+        skills = user_data.get('skills', [])
+        if isinstance(skills, list):
+            skills_str = ', '.join(str(skill) for skill in skills)
+        else:
+            skills_str = str(skills) if skills else 'Various skills'
+        experience = str(user_data.get('experience', 'Professional experience'))
+        
         prompt = f"""
         You are conducting a conversational job interview. Generate the next question based on:
         
         {context}
         
         Candidate Background:
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
+        Skills: {skills_str}
+        Experience: {experience}
         
         This is question #{question_number} of 5. Generate a natural, conversational interview question that:
         1. Flows from the previous conversation
@@ -452,8 +504,12 @@ class GroqLLM:
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=200, temperature=0.7)
-        return response if response and not response.startswith("❌") else "Can you tell me more about your relevant experience for this role?"
+        try:
+            response = self._make_request(messages, max_tokens=200, temperature=0.7)
+            return response if response and not response.startswith("❌") else "Can you tell me more about your relevant experience for this role?"
+        except Exception as e:
+            print(f"Error generating chat interview question: {e}")
+            return "Can you tell me more about your relevant experience for this role?"
 
     def analyze_chat_interview(self, questions: List[str], answers: List[str], job_info: Dict[str, Any], user_data: Dict[str, Any]) -> Dict[str, Any]:
         interview_content = ""
@@ -512,6 +568,98 @@ class GroqLLM:
                 "recommendations": ["Practice the STAR method", "Prepare specific achievement stories"]
             }
 
+    def analyze_job_matches(self, jobs: List[Dict[str, Any]], user_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Analyze job matches against user profile and enhance job data with AI insights"""
+        enhanced_jobs = []
+        
+        for job in jobs:
+            try:
+                # Get job description for analysis
+                job_desc = job.get('description', '')
+                job_title = job.get('title', '')
+                
+                # Create analysis prompt
+                prompt = f"""
+                Analyze this job posting against the candidate's profile:
+                
+                Job Title: {job_title}
+                Job Description: {job_desc}
+                
+                Candidate Profile:
+                Skills: {', '.join(user_data.get('skills', []))}
+                Experience: {user_data.get('experience', 'Professional experience')}
+                Title: {user_data.get('title', 'Professional')}
+                
+                Provide a match analysis:
+                {{
+                    "match_score": 85,
+                    "match_level": "Excellent",
+                    "matched_keywords": ["Python", "React", "API"],
+                    "missing_skills": ["Docker", "AWS"],
+                    "strengths": ["Strong technical background", "Relevant experience"],
+                    "recommendations": ["Highlight Python experience", "Mention API development projects"]
+                }}
+                
+                Return only valid JSON.
+                """
+                
+                messages = [
+                    {"role": "system", "content": "You are an expert job match analyzer. Return only valid JSON with match analysis."},
+                    {"role": "user", "content": prompt}
+                ]
+                
+                response = self._make_request(messages, max_tokens=500, temperature=0.3)
+                
+                try:
+                    # Try to parse JSON response
+                    json_start = response.find('{')
+                    json_end = response.rfind('}') + 1
+                    if json_start != -1 and json_end != 0:
+                        json_str = response[json_start:json_end]
+                        analysis = json.loads(json_str)
+                        job['ai_analysis'] = analysis
+                        job['ai_match_score'] = analysis.get('match_score', 75)
+                    else:
+                        # Fallback if JSON parsing fails
+                        job['ai_analysis'] = {
+                            "match_score": 75,
+                            "match_level": "Good",
+                            "matched_keywords": [],
+                            "missing_skills": [],
+                            "strengths": ["Review job requirements"],
+                            "recommendations": ["Tailor your application"]
+                        }
+                        job['ai_match_score'] = 75
+                except:
+                    # Fallback analysis
+                    job['ai_analysis'] = {
+                        "match_score": 75,
+                        "match_level": "Good",
+                        "matched_keywords": [],
+                        "missing_skills": [],
+                        "strengths": ["Review job requirements"],
+                        "recommendations": ["Tailor your application"]
+                    }
+                    job['ai_match_score'] = 75
+                
+            except Exception as e:
+                # Add fallback analysis if anything goes wrong
+                job['ai_analysis'] = {
+                    "match_score": 70,
+                    "match_level": "Fair",
+                    "matched_keywords": [],
+                    "missing_skills": [],
+                    "strengths": ["Review carefully"],
+                    "recommendations": ["Analyze job requirements"]
+                }
+                job['ai_match_score'] = 70
+            
+            enhanced_jobs.append(job)
+        
+        # Sort jobs by match score (highest first)
+        enhanced_jobs.sort(key=lambda x: x.get('ai_match_score', 0), reverse=True)
+        return enhanced_jobs
+
     def chat_about_resume(self, resume_content: str, user_message: str, chat_history: List[Dict] = None) -> str:
         if chat_history is None:
             chat_history = []
@@ -541,16 +689,24 @@ class GroqLLM:
         5. Help optimize for ATS systems
         6. Suggest additional skills or experiences to highlight
         7. Help tailor the resume for specific jobs
-        
-        Be conversational, supportive, and provide actionable advice.
+          Be conversational, supportive, and provide actionable advice.
         """
-        
         messages = [
             {"role": "system", "content": "You are a friendly and expert career counselor who helps people improve their resumes. Be conversational, supportive, and provide specific, actionable advice."},
             {"role": "user", "content": prompt}
         ]
         
         return self._make_request(messages, max_tokens=1000, temperature=0.7)
+
+    def chat_with_resume(self, user_message: str, context: str) -> str:
+        """
+        Chat with resume functionality - wrapper for chat_about_resume
+        """
+        try:
+            # Use the existing chat_about_resume method with correct parameter order
+            return self.chat_about_resume(context, user_message, chat_history=None)
+        except Exception as e:
+            return f"I apologize, but I encountered an error while processing your request: {str(e)}. Please try asking your question in a different way."
 
     def analyze_job_requirements(self, job_description: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
         prompt = f"""
@@ -695,8 +851,8 @@ class GroqLLM:
                 break
         
         return parsed_data
-
-    def generate_enhanced_portfolio(self, user_data: Dict[str, Any]) -> str:
+    
+    def generate_enhanced_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         prompt = f"""
         Create a comprehensive and professional portfolio content for the following person.
         Make it engaging, well-structured, and highlight their strengths and achievements.
@@ -714,28 +870,82 @@ class GroqLLM:
         Projects: {user_data.get('projects', 'N/A')}
         Certifications: {user_data.get('certifications', 'N/A')}
         
-        Create a portfolio with the following sections:
-        1. Professional Summary
-        2. Core Competencies
-        3. Professional Experience (with achievements)
-        4. Education & Certifications
-        5. Featured Projects
-        6. Technical Skills
-        7. Contact Information
+        Return a structured JSON portfolio with these sections:
+        {{
+            "headline": "Professional headline/tagline",
+            "about": "Compelling professional summary",
+            "skills": ["skill1", "skill2", "skill3"],
+            "projects": [
+                {{
+                    "name": "Project Name",
+                    "description": "Brief project description highlighting achievements",
+                    "technologies": ["tech1", "tech2"]
+                }}
+            ],
+            "experience": [
+                {{
+                    "title": "Job Title",
+                    "company": "Company Name",
+                    "duration": "Date Range",
+                    "achievements": ["Achievement 1", "Achievement 2"]
+                }}
+            ],
+            "education": "Education summary",
+            "certifications": ["cert1", "cert2"]
+        }}
         
         Make it professional, compelling, and tailored to showcase their unique value proposition.
         Use modern, engaging language and highlight quantifiable achievements where possible.
+        Return only valid JSON.
         """
         
         messages = [
-            {"role": "system", "content": "You are a professional portfolio writer with expertise in creating compelling personal portfolios that showcase candidates in the best light."},
+            {"role": "system", "content": "You are a professional portfolio writer. Create structured portfolio data in JSON format only."},
             {"role": "user", "content": prompt}
         ]
         
         try:
-            return self._make_request(messages, max_tokens=2500, temperature=0.8)
+            response = self._make_request(messages, max_tokens=2500, temperature=0.8)
+            
+            # Try to parse JSON response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start != -1 and json_end != 0:
+                json_str = response[json_start:json_end]
+                portfolio_data = json.loads(json_str)
+                return portfolio_data
+            else:
+                # Fallback if JSON parsing fails
+                return self._create_fallback_portfolio(user_data)
+                
         except Exception as e:
-            return f"Error generating enhanced portfolio: {str(e)}"
+            print(f"Error generating enhanced portfolio: {str(e)}")
+            return self._create_fallback_portfolio(user_data)
+    
+    def _create_fallback_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a fallback portfolio structure when AI generation fails"""
+        return {
+            "headline": f"{user_data.get('title', 'Professional')} | Experienced in Technology & Innovation",
+            "about": f"Accomplished {user_data.get('title', 'professional')} with extensive experience in delivering high-quality solutions. Passionate about technology and innovation with a proven track record of success.",
+            "skills": user_data.get('skills', ['Leadership', 'Problem Solving', 'Communication', 'Technical Skills']),
+            "projects": [
+                {
+                    "name": "Professional Project Portfolio",
+                    "description": "Comprehensive collection of professional projects demonstrating technical expertise and problem-solving capabilities",
+                    "technologies": user_data.get('skills', ['Various Technologies'])[:3]
+                }
+            ],
+            "experience": [
+                {
+                    "title": user_data.get('title', 'Professional'),
+                    "company": "Professional Experience",
+                    "duration": "Current",
+                    "achievements": ["Delivered high-quality solutions", "Collaborated with cross-functional teams", "Contributed to organizational success"]
+                }
+            ],
+            "education": user_data.get('education', 'Educational background in relevant field'),
+            "certifications": user_data.get('certifications', ['Professional Certifications'])
+        }
 
     def generate_deployment_guide(self, hosting_option: str, user_data: Dict[str, Any]) -> str:
         """Generate deployment guide for the specified hosting option."""

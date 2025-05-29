@@ -129,7 +129,7 @@ class InterviewUI:
                     st.session_state.interview_session = session
                     st.session_state.interview_active = True
                     st.success("✅ Interview session created! Starting now...")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("❌ Failed to create interview session. Please try again.")
             else:
@@ -165,17 +165,17 @@ class InterviewUI:
                     evaluation = self.simulator.submit_answer(session, answer)
                     if evaluation:
                         st.session_state.last_evaluation = evaluation
-                        st.experimental_rerun()
+                        st.rerun()
         
         with col2:
             if st.button("Skip Question"):
                 self.simulator.submit_answer(session, "Skipped")
-                st.experimental_rerun()
+                st.rerun()
         
         with col3:
             if st.button("End Interview"):
                 st.session_state.interview_active = False
-                st.experimental_rerun()
+                st.rerun()
         
         if hasattr(st.session_state, 'last_evaluation') and st.session_state.last_evaluation:
             self.render_question_feedback(st.session_state.last_evaluation)
@@ -265,7 +265,7 @@ class InterviewUI:
                     del st.session_state.interview_active
                 if 'last_evaluation' in st.session_state:
                     del st.session_state.last_evaluation
-                st.experimental_rerun()
+                st.rerun()
         
         with col2:
             if st.button("Download Report"):

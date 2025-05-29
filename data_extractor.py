@@ -127,9 +127,9 @@ class JobSearcher:
             print("Job search will use fallback methods")
             self.google_jobs_api = None
             self.api_available = False
-        
+    
     def search_jobs(self, keywords: str, location: str = "", experience_level: str = "", 
-                    company_size: str = "", remote: bool = False, limit: int = 20) -> List[Dict]:
+                    company_size: str = "", remote: bool = False, job_type: str = "Full-time Jobs", limit: int = 20) -> List[Dict]:
         
         try:
             if self.api_available and self.google_jobs_api:
@@ -157,7 +157,7 @@ class JobSearcher:
         except Exception as e:
             print(f"Google Jobs API error, using fallback: {str(e)}")
         
-        return self._fallback_search(keywords, location, experience_level, limit)
+        return self._fallback_search(keywords, location, experience_level, job_type, limit)
     
     def _filter_jobs_by_criteria(self, jobs: List[Dict], experience_level: str, 
                                 company_size: str, remote: bool) -> List[Dict]:
@@ -287,7 +287,7 @@ class JobSearcher:
             'location': location or 'All locations'
         }
     
-    def _fallback_search(self, keywords: str, location: str, experience_level: str, limit: int) -> List[Dict]:
+    def _fallback_search(self, keywords: str, location: str, experience_level: str, job_type: str, limit: int) -> List[Dict]:
         """Fallback job search when LinkedIn API fails"""
         
         experience_titles = {
@@ -334,20 +334,47 @@ class JobSearcher:
                 'Senior Level (6-10 years)': ['$140,000 - $200,000', '$135,000 - $190,000', '$150,000 - $220,000'],
                 'Executive (10+ years)': ['$200,000 - $350,000', '$250,000 - $400,000', '$300,000 - $500,000']
             }
+              # Determine employment type based on job_type selection
+            if job_type == "Internships":
+                employment_type = "Internship"
+                title_suffix = "Intern"
+            elif job_type == "Full-time Jobs":
+                employment_type = "Full-time"
+                title_suffix = keywords
+            else:  # Both Jobs & Internships
+                employment_type = "Internship" if i % 3 == 0 else "Full-time"
+                title_suffix = "Intern" if employment_type == "Internship" else keywords
+            
+            # Define diverse application platforms
+            platforms = [
+                {'name': 'LinkedIn', 'url': f'https://www.linkedin.com/jobs/view/{1000000 + i}', 'icon': '💼'},
+                {'name': 'Indeed', 'url': f'https://www.indeed.com/viewjob?jk=job{i}', 'icon': '🔍'},
+                {'name': 'Glassdoor', 'url': f'https://www.glassdoor.com/job-listing/job{i}', 'icon': '🏢'},
+                {'name': 'AngelList', 'url': f'https://angel.co/jobs/{i}', 'icon': '👼'},
+                {'name': 'Company Website', 'url': f'https://careers.{company["name"].lower().replace(" ", "")}.com/apply/{i}', 'icon': '🌐'},
+                {'name': 'ZipRecruiter', 'url': f'https://www.ziprecruiter.com/jobs/{i}', 'icon': '⚡'},
+                {'name': 'Monster', 'url': f'https://www.monster.com/job/{i}', 'icon': '👹'},
+                {'name': 'CareerBuilder', 'url': f'https://www.careerbuilder.com/job/{i}', 'icon': '🔨'}
+            ]
+            
+            # Select platform for this job
+            platform = platforms[i % len(platforms)]
             
             job = {
-                'id': f'linkedin_job_{i}',
-                'title': f"{prefix} {keywords} {'Engineer' if i % 2 == 0 else 'Developer'}".strip(),
+                'id': f'job_{platform["name"].lower()}_{i}',
+                'title': f"{prefix} {title_suffix} {'Engineer' if i % 2 == 0 else 'Developer'}".strip(),
                 'company': company['name'],
                 'company_industry': company['industry'],
                 'company_size': company['size'],
                 'location': job_location,
                 'description': job_descriptions[i % len(job_descriptions)],
-                'employment_type': 'Full-time',
+                'employment_type': employment_type,
                 'experience_level': experience_level or 'Mid Level',
                 'posted_date': self._get_recent_date(i),
                 'linkedin_url': f'https://www.linkedin.com/jobs/view/{1000000 + i}',
-                'application_url': f'https://careers.{company["name"].lower()}.com/apply/{i}',
+                'application_url': platform['url'],
+                'application_platform': platform['name'],
+                'platform_icon': platform['icon'],
                 'salary_range': salary_ranges.get(experience_level, salary_ranges['Mid Level (3-5 years)'])[i % 3],
                 'remote_type': 'Remote' in job_location or i % 4 == 0,
                 'skills': self._generate_relevant_skills(keywords),
