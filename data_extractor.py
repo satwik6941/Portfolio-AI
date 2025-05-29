@@ -7,7 +7,8 @@ from bs4 import BeautifulSoup
 import re
 import json
 from typing import Dict, List, Optional
-from google_jobs_service import GoogleJobsService
+# Import google_jobs_service only when needed to avoid blocking
+# from google_jobs_service import GoogleJobsService
 
 class DataExtractor:
     def __init__(self):
@@ -107,29 +108,184 @@ class DataExtractor:
 
 class JobSearcher:
     def __init__(self):
-        self.google_jobs_api = GoogleJobsService()
+        self.google_jobs_api = None
+        self.api_available = False
         self.job_cache = {}  # Cache for performance
+        
+        # Lazy load Google Jobs API to avoid blocking startup
+        self._initialize_google_api()
+        
+    def _initialize_google_api(self):
+        """Initialize Google Jobs API lazily"""
+        try:
+            from google_jobs_service import GoogleJobsService
+            self.google_jobs_api = GoogleJobsService()
+            self.api_available = self.google_jobs_api.validate_api_access()
+            print("✅ Google Jobs API initialized successfully")
+        except Exception as e:
+            print(f"⚠️ Google Jobs API initialization failed: {str(e)}")
+            print("Job search will use fallback methods")
+            self.google_jobs_api = None
+            self.api_available = False
         
     def search_jobs(self, keywords: str, location: str = "", experience_level: str = "", 
                     company_size: str = "", remote: bool = False, limit: int = 20) -> List[Dict]:
         
         try:
-            # Use Google Cloud Talent Solution API
-            jobs = self.google_jobs_api.search_jobs(
-                query=keywords,
-                location=location,
-                limit=limit
-            )
-            
-            if jobs:
-                cache_key = f"{keywords}_{location}_{experience_level}"
-                self.job_cache[cache_key] = jobs
-                return jobs
+            if self.api_available and self.google_jobs_api:
+                # Use Google Cloud Talent Solution API
+                employment_types = ["FULL_TIME", "PART_TIME"]
+                if remote:
+                    # Add contract work for remote jobs
+                    employment_types.append("CONTRACT")
                 
+                jobs = self.google_jobs_api.search_jobs(
+                    query=keywords,
+                    location=location,
+                    limit=limit,
+                    employment_types=employment_types
+                )
+                
+                if jobs:
+                    # Filter by experience level and company size if specified
+                    filtered_jobs = self._filter_jobs_by_criteria(jobs, experience_level, company_size, remote)
+                    
+                    cache_key = f"{keywords}_{location}_{experience_level}"
+                    self.job_cache[cache_key] = filtered_jobs
+                    return filtered_jobs
+                    
         except Exception as e:
             print(f"Google Jobs API error, using fallback: {str(e)}")
         
         return self._fallback_search(keywords, location, experience_level, limit)
+    
+    def _filter_jobs_by_criteria(self, jobs: List[Dict], experience_level: str, 
+                                company_size: str, remote: bool) -> List[Dict]:
+        """Filter jobs based on additional criteria"""
+        filtered_jobs = []
+        
+        for job in jobs:
+            # Filter by remote preference
+            if remote and not job.get('remote_type'):
+                continue
+            
+            # Filter by company size (basic matching)
+            if company_size and company_size != job.get('company_size', ''):
+                # Allow some flexibility in company size matching
+                pass
+            
+            # Filter by experience level (basic keyword matching in description)
+            if experience_level:
+                exp_keywords = self._get_experience_keywords(experience_level)
+                job_text = f"{job.get('description', '')} {job.get('title', '')}".lower()
+                
+                if exp_keywords and not any(keyword in job_text for keyword in exp_keywords):
+                    # Still include job but lower its relevance
+                    job['experience_match'] = False
+                else:
+                    job['experience_match'] = True
+            
+            filtered_jobs.append(job)
+        
+        return filtered_jobs
+    
+    def _get_experience_keywords(self, experience_level: str) -> List[str]:
+        """Get keywords associated with experience levels"""
+        level_keywords = {
+            "Entry Level (0-2 years)": ["entry", "junior", "associate", "new grad", "0-2 years"],
+            "Mid Level (3-5 years)": ["mid", "intermediate", "3-5 years", "experienced"],
+            "Senior Level (6-10 years)": ["senior", "lead", "principal", "6+ years", "expert"],
+            "Executive (10+ years)": ["director", "manager", "executive", "head of", "vp", "chief"]
+        }
+        
+        return level_keywords.get(experience_level, [])
+    
+    def get_job_recommendations(self, user_skills: List[str], location: str = "") -> List[Dict]:
+        """Get personalized job recommendations"""
+        try:
+            if self.api_available and self.google_jobs_api:
+                return self.google_jobs_api.get_job_recommendations(user_skills, location)
+        except Exception as e:
+            print(f"Error getting job recommendations: {str(e)}")
+        
+        # Fallback to regular search
+        skills_query = " ".join(user_skills[:3]) if user_skills else "software developer"
+        return self.search_jobs(skills_query, location, limit=10)
+    
+    def get_trending_jobs(self, location: str = "") -> List[Dict]:
+        """Get trending job opportunities"""
+        try:
+            if self.api_available and self.google_jobs_api:
+                return self.google_jobs_api.get_trending_jobs(location)
+        except Exception as e:
+            print(f"Error getting trending jobs: {str(e)}")
+        
+        # Fallback trending searches
+        return self._fallback_trending_search(location)
+    
+    def _fallback_trending_search(self, location: str) -> List[Dict]:
+        """Fallback method for trending jobs"""
+        trending_queries = [
+            "AI engineer", "cloud engineer", "full stack developer", 
+            "data scientist", "DevOps engineer"
+        ]
+        
+        all_jobs = []
+        for query in trending_queries[:3]:
+            jobs = self._fallback_search(query, location, "", 3)
+            all_jobs.extend(jobs)
+        
+        return all_jobs[:12]
+    
+    def get_salary_insights(self, job_title: str, location: str = "") -> Dict:
+        """Get salary insights for a job title and location"""
+        try:
+            if self.api_available and self.google_jobs_api:
+                return self.google_jobs_api.get_salary_insights(job_title, location)
+        except Exception as e:
+            print(f"Error getting salary insights: {str(e)}")
+        
+        return self._fallback_salary_insights(job_title, location)
+    
+    def _fallback_salary_insights(self, job_title: str, location: str) -> Dict:
+        """Fallback salary insights"""
+        base_salaries = {
+            'software engineer': 110000,
+            'data scientist': 120000,
+            'product manager': 135000,
+            'devops engineer': 115000,
+            'frontend developer': 95000,
+            'backend developer': 105000
+        }
+        
+        base_salary = 95000  # default
+        for title, salary in base_salaries.items():
+            if title in job_title.lower():
+                base_salary = salary
+                break
+        
+        # Location adjustments
+        location_multipliers = {
+            'san francisco': 1.4, 'new york': 1.3, 'seattle': 1.2,
+            'boston': 1.15, 'austin': 1.1, 'remote': 1.0
+        }
+        
+        multiplier = 1.0
+        for loc, mult in location_multipliers.items():
+            if loc in location.lower():
+                multiplier = mult
+                break
+        
+        adjusted_salary = int(base_salary * multiplier)
+        
+        return {
+            'median_salary': adjusted_salary,
+            'min_salary': int(adjusted_salary * 0.7),
+            'max_salary': int(adjusted_salary * 1.4),
+            'sample_size': 50,
+            'job_title': job_title,
+            'location': location or 'All locations'
+        }
     
     def _fallback_search(self, keywords: str, location: str, experience_level: str, limit: int) -> List[Dict]:
         """Fallback job search when LinkedIn API fails"""
@@ -259,39 +415,112 @@ class JobSearcher:
         
         experience_requirements = {
             'Entry Level (0-2 years)': ['Bachelor\'s degree or equivalent', 'Willingness to learn'],
-            'Mid Level (3-5 years)': ['3-5 years of relevant experience', 'Proven track record'],
-            'Senior Level (6-10 years)': ['6+ years of experience', 'Leadership experience', 'Mentoring capabilities'],
-            'Executive (10+ years)': ['10+ years of experience', 'Strategic thinking', 'Team management', 'P&L responsibility']        }
+            'Mid Level (3-5 years)': ['3-5 years of relevant experience', 'Proven track record'],            'Senior Level (6-10 years)': ['6+ years of experience', 'Leadership experience', 'Mentoring capabilities'],
+            'Executive (10+ years)': ['10+ years of experience', 'Strategic thinking', 'Team management', 'P&L responsibility']
+        }
         
         requirements = base_requirements + experience_requirements.get(experience_level, [])
         return requirements
     
     def get_job_details(self, job_id: str) -> Optional[Dict]:
+        """Get detailed information about a specific job"""
         try:
-            # Google Jobs API doesn't have a direct job details endpoint
-            # Return None for now, could be enhanced with additional API calls
-            return None
+            if self.api_available and self.google_jobs_api:
+                return self.google_jobs_api.get_job_details(job_id)
         except Exception as e:
             print(f"Error fetching job details: {str(e)}")
-            return None
+        
+        return None
     
     def get_company_insights(self, company_name: str) -> Dict:
+        """Get insights about a company"""
         try:
-            # Use Google Jobs API to search for company information
-            # For now, return enhanced fallback data
-            pass
+            # Search for jobs at the company to gather insights
+            if self.api_available and self.google_jobs_api:
+                company_jobs = self.google_jobs_api.search_jobs_by_company([company_name])
+                
+                if company_jobs:
+                    # Aggregate insights from job postings
+                    total_jobs = len(company_jobs)
+                    common_skills = self._extract_common_skills(company_jobs)
+                    salary_range = self._estimate_company_salary_range(company_jobs)
+                    
+                    return {
+                        'name': company_name,
+                        'open_positions': total_jobs,
+                        'common_skills': common_skills,
+                        'salary_range': salary_range,
+                        'locations': list(set([job.get('location', '') for job in company_jobs])),
+                        'remote_friendly': any(job.get('remote_type') for job in company_jobs),
+                        'data_source': 'google_talent_api'
+                    }
         except Exception as e:
             print(f"Error fetching company insights: {str(e)}")
         
+        # Fallback company insights
         return {
             'name': company_name,
             'industry': 'Technology',
             'size': 'Medium',
             'description': f'{company_name} is an innovative company focused on growth and excellence.',
-            'linkedin_url': f'https://www.linkedin.com/company/{company_name.lower()}',
+            'linkedin_url': f'https://www.linkedin.com/company/{company_name.lower().replace(" ", "-")}',
             'founded_year': 2010,
-            'headquarters': 'San Francisco, CA'
+            'headquarters': 'San Francisco, CA',
+            'data_source': 'estimated'
         }
+    
+    def _extract_common_skills(self, jobs: List[Dict]) -> List[str]:
+        """Extract most common skills from job listings"""
+        skill_counts = {}
+        
+        for job in jobs:
+            skills = job.get('skills', [])
+            for skill in skills:
+                skill_counts[skill] = skill_counts.get(skill, 0) + 1
+        
+        # Return top 10 most common skills
+        sorted_skills = sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)
+        return [skill for skill, count in sorted_skills[:10]]
+    
+    def _estimate_company_salary_range(self, jobs: List[Dict]) -> Dict:
+        """Estimate salary range for a company based on job postings"""
+        salaries = []
+        
+        for job in jobs:
+            salary_str = job.get('salary', '')
+            if salary_str and 'competitive' not in salary_str.lower():
+                # Extract salary numbers
+                salary_numbers = self._extract_salary_numbers_basic(salary_str)
+                salaries.extend(salary_numbers)
+        
+        if salaries:
+            return {
+                'min': min(salaries),
+                'max': max(salaries),
+                'average': sum(salaries) // len(salaries)
+            }
+        
+        return {'min': 70000, 'max': 150000, 'average': 110000}
+    
+    def _extract_salary_numbers_basic(self, salary_str: str) -> List[int]:
+        """Basic salary number extraction"""
+        import re
+        numbers = re.findall(r'\d{4,6}', salary_str)
+        
+        salary_values = []
+        for num_str in numbers:
+            try:
+                num = int(num_str)
+                if 30000 <= num <= 500000:
+                    salary_values.append(num)
+            except ValueError:
+                continue
+        
+        return salary_values
+    
+    def validate_google_jobs_access(self) -> bool:
+        """Validate Google Cloud Talent Solution API access"""
+        return self.api_available
     
     def get_salary_insights(self, job_title: str, location: str = "") -> Dict:
         try:
@@ -348,13 +577,13 @@ class JobSearcher:
                     'Statistics', 'Deep Learning', 'Apache Spark', 'TensorFlow', 'PyTorch'
                 ],
                 'marketing': [
-                    'Digital Marketing', 'Content Strategy', 'Social Media Marketing',
-                    'SEO/SEM', 'Marketing Analytics', 'Growth Hacking', 'Email Marketing'
+                    'Digital Marketing', 'Content Strategy', 'Social Media Marketing',                    'SEO/SEM', 'Marketing Analytics', 'Growth Hacking', 'Email Marketing'
                 ],
                 'finance': [
                     'Financial Analysis', 'Risk Management', 'Fintech', 'Cryptocurrency',
                     'ESG Investing', 'Robo-Advisory', 'Regulatory Compliance'
-                ]            }
+                ]
+            }
             
             industry_key = industry.lower() if industry else 'technology'
             return skill_trends.get(industry_key, skill_trends['technology'])
@@ -369,7 +598,7 @@ class JobSearcher:
         
         alerts = []
         
-        for skill in skills[:3]: 
+        for skill in skills[:3]:
             try:
                 jobs = self.search_jobs(
                     keywords=skill, 
@@ -388,12 +617,94 @@ class JobSearcher:
             if job_key not in seen_jobs:
                 seen_jobs.add(job_key)
                 unique_alerts.append(job)
+        
+        return unique_alerts[:10]
+    
+    def get_trending_skills(self, industry: str = "") -> List[str]:
+        """Get trending skills in the industry"""
+        try:
+            if self.api_available and self.google_jobs_api:
+                trending_jobs = self.google_jobs_api.get_trending_jobs()
+                return self._extract_common_skills(trending_jobs)
+        except Exception as e:
+            print(f"Error getting trending skills: {str(e)}")
+        
+        # Fallback trending skills
+        default_skills = [
+            "Python", "JavaScript", "React", "AWS", "Docker", "Kubernetes",
+            "Machine Learning", "Node.js", "TypeScript", "GraphQL",
+            "Microservices", "CI/CD", "Agile", "SQL", "NoSQL"
+        ]
+        
+        return default_skills[:10]
+    
+    def get_job_alerts(self, user_profile: Dict, preferences: Dict) -> List[Dict]:
+        """Get personalized job alerts based on user profile and preferences"""
+        try:
+            skills = user_profile.get('skills', [])
+            location = preferences.get('location', '')
+            
+            if self.api_available and self.google_jobs_api:
+                recommended_jobs = self.google_jobs_api.get_job_recommendations(skills, location)
                 
-        return unique_alerts[:10]  
+                # Filter based on preferences
+                filtered_jobs = []
+                for job in recommended_jobs:
+                    if self._matches_preferences(job, preferences):
+                        job['alert_type'] = 'recommendation'
+                        job['match_reason'] = self._get_match_reason(job, user_profile)
+                        filtered_jobs.append(job)
+                
+                return filtered_jobs[:5]  # Return top 5 alerts
+        except Exception as e:
+            print(f"Error getting job alerts: {str(e)}")
+        
+        return []
+    
+    def _matches_preferences(self, job: Dict, preferences: Dict) -> bool:
+        """Check if job matches user preferences"""
+        # Check salary expectations
+        expected_salary = preferences.get('salary_min', 0)
+        if expected_salary > 0:
+            job_salary = self._estimate_job_salary(job.get('salary', ''))
+            if job_salary > 0 and job_salary < expected_salary:
+                return False
+        
+        # Check remote work preference
+        if preferences.get('remote_only', False):
+            if not job.get('remote_type'):
+                return False
+        
+        # Check employment type
+        preferred_types = preferences.get('employment_types', [])
+        if preferred_types and job.get('employment_type') not in preferred_types:
+            return False
+        
+        return True
+    
+    def _estimate_job_salary(self, salary_str: str) -> int:
+        """Estimate numeric salary from salary string"""
+        if not salary_str or 'competitive' in salary_str.lower():
+            return 0
+        
+        numbers = self._extract_salary_numbers_basic(salary_str)
+        return max(numbers) if numbers else 0
+    
+    def _get_match_reason(self, job: Dict, user_profile: Dict) -> str:
+        """Get reason why job matches user profile"""
+        user_skills = set(skill.lower() for skill in user_profile.get('skills', []))
+        job_skills = set(skill.lower() for skill in job.get('skills', []))
+        
+        common_skills = user_skills.intersection(job_skills)
+        
+        if common_skills:
+            return f"Matches your skills: {', '.join(list(common_skills)[:3])}"
+        
+        if user_profile.get('title', '').lower() in job.get('title', '').lower():
+            return "Matches your job title"
+        
+        return "Recommended based on your profile"
     
     def validate_google_jobs_access(self) -> bool:
         """Validate Google Cloud Talent Solution API access"""
-        try:
-            return self.google_jobs_api.api_key is not None
-        except:
-            return False
+        return self.api_available

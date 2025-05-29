@@ -1011,17 +1011,13 @@ class PortfolioGenerator:
 
 
 class ResumeGenerator:
-    """Enhanced Resume Generator with PDF and text output capabilities"""
-    
     def __init__(self):
         pass
 
     def _clean_resume_content(self, content: str) -> str:
-        """Remove AI analysis statements and clean content for ATS optimization"""
         lines = content.split('\n')
         cleaned_lines = []
         
-        # Patterns to remove (AI analysis statements and formatting symbols)
         skip_patterns = [
             'Here\'s an enhanced',
             'ATS-optimized formatting',
@@ -1040,10 +1036,48 @@ class ResumeGenerator:
             'This AI-generated',
             'AI optimization',
             'meets your requirements',
-            '* **',  # Remove bullet points with bold formatting
-            '**',    # Remove bold symbols
-            '###',   # Remove markdown headers
-            '---',   # Remove separator lines
+            'incorporates current',
+            'leverages industry',
+            'utilizes modern',
+            'features enhanced',
+            'this enhanced version',
+            'incorporates key',
+            'The enhanced resume',
+            'incorporates trending',
+            'This tailored resume',
+            'The above resume',
+            'Note that this',
+            'Please note',
+            'This document',
+            'Format in clean',
+            'suitable for both ATS',
+            'Here\'s a professional',
+            'Here\'s your',
+            'This resume has been',
+            'The resume above',
+            'I\'ve created',
+            'I\'ve tailored',
+            'I\'ve enhanced',
+            'Based on your',
+            'Using your information',
+            'This version',
+            'Resume created',
+            'Resume generated',
+            'Crafted specifically',            
+            'Tailored for',
+            'Created using',
+            'Based on the information',
+            'After the References section',
+            'Following the References',
+            'Below References',
+            'References section ends',
+            'Post-references content',
+            'Content after References',
+            'Beyond the References',
+            '* **',  
+            '**',   
+            '###',   
+            '---',   
         ]
         
         skip_entire_line_patterns = [
@@ -1055,16 +1089,47 @@ class ResumeGenerator:
             'The resume uses',
             'Verbs like',
             'The resume incorporates',
+            'This enhanced resume',
+            'The enhanced version',
+            'This version incorporates',
+            'Incorporates current',
+            'Features enhanced',
+            'Leverages industry',
+            'Utilizes modern',
+            'This incorporates',
+            'Enhanced with',
+            'This resume leverages',
+            'Incorporates trending',            
+            'This enhanced version',
+            'The following incorporates',
+            'Thank you for considering',
+            'Available upon request',
+            'References available',
+            'Additional information',
+            'Please feel free to contact',
+            'I look forward to',
+            'Hope this helps',
+            'Feel free to reach out',
+            'Let me know if you need',
+            'Happy to provide',
+            'Should you require',
+            'If you have any questions',
         ]
+        
+        # Skip lines that contain email addresses to avoid duplication
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         
         for line in lines:
             line = line.strip()
             
-            # Skip empty lines
             if not line:
                 continue
             
-            # Check if entire line should be skipped
+            # Skip lines with email addresses to avoid duplication with header
+            import re
+            if re.search(email_pattern, line):
+                continue
+
             should_skip_line = False
             for pattern in skip_entire_line_patterns:
                 if pattern.lower() in line.lower():
@@ -1074,11 +1139,9 @@ class ResumeGenerator:
             if should_skip_line:
                 continue
             
-            # Clean formatting symbols from the line
             for pattern in skip_patterns:
                 line = line.replace(pattern, '')
             
-            # Clean up extra spaces and formatting
             line = line.replace('**', '').replace('*', '').replace('###', '').strip()
             
             if line and not line.startswith('*') and len(line) > 3:
@@ -1173,8 +1236,7 @@ class CoverLetterGenerator:
         """Remove AI analysis statements and clean content for professional output"""
         lines = content.split('\n')
         cleaned_lines = []
-        
-        # Patterns to remove (AI analysis statements and formatting symbols)
+          # Patterns to remove (AI analysis statements and formatting symbols)
         skip_patterns = [
             'Here\'s an enhanced',
             'ATS-optimized',
@@ -1187,6 +1249,16 @@ class CoverLetterGenerator:
             'Enhanced by AI',
             'Optimized by AI',
             'meets your requirements',
+            'incorporates current',
+            'leverages industry',
+            'utilizes modern',
+            'features enhanced',
+            'this enhanced version',
+            'incorporates key',
+            'The enhanced cover letter',
+            'incorporates trending',
+            'This letter incorporates',
+            'Enhanced with',
             '* **',  # Remove bullet points with bold formatting
             '**',    # Remove bold symbols
             '###',   # Remove markdown headers
@@ -1200,16 +1272,28 @@ class CoverLetterGenerator:
             'The resume uses',
             'Verbs like',
             'The resume incorporates',
+            'This enhanced cover letter',
+            'The enhanced version',
+            'This version incorporates',
+            'Incorporates current',
+            'Features enhanced',
+            'Leverages industry',
+            'Utilizes modern',
+            'This incorporates',
+            'Enhanced with',
+            'This letter leverages',
+            'Incorporates trending',
+            'This enhanced version',
+            'The following incorporates',
+            'This letter incorporates',
         ]
         
         for line in lines:
             line = line.strip()
             
-            # Skip empty lines
             if not line:
                 continue
             
-            # Check if entire line should be skipped
             should_skip_line = False
             for pattern in skip_entire_line_patterns:
                 if pattern.lower() in line.lower():
@@ -1219,11 +1303,9 @@ class CoverLetterGenerator:
             if should_skip_line:
                 continue
             
-            # Clean formatting symbols from the line
             for pattern in skip_patterns:
                 line = line.replace(pattern, '')
             
-            # Clean up extra spaces and formatting
             line = line.replace('**', '').replace('*', '').replace('###', '').strip()
             
             if line and not line.startswith('*') and len(line) > 3:
@@ -1254,7 +1336,6 @@ Sincerely,
         return formatted_letter.strip()
 
     def save_cover_letter(self, content: str, company_name: str, filename: str = None) -> str:
-        """Save cover letter to file"""
         if not filename:
             safe_company = "".join(c for c in company_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
             filename = f"cover_letter_{safe_company}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"

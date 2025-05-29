@@ -29,117 +29,63 @@ class InterviewSimulator:
         return None
     
     def submit_answer(self, session: Dict, answer: str) -> Dict:
-        """Submit answer and get feedback"""
         current_q = self.get_current_question(session)
         if not current_q:
             return None
         
+        # Evaluate the answer using Groq service
         evaluation = self.groq_service.evaluate_interview_answer(
             current_q['question'], 
             answer, 
             session['job_description']
         )
         
+        # Store the answer and evaluation
         session['answers'].append(answer)
         session['scores'].append(evaluation.get('score', 5))
         session['feedback'].append(evaluation)
         
+        # Move to next question
         session['current_question'] += 1
         
         return evaluation
     
     def get_final_report(self, session: Dict) -> Dict:
-        if not session['scores']:
-            return {'error': 'No answers submitted'}
+        if not session['answers']:
+            return {
+                'overall_score': 0,
+                'performance_level': 'Incomplete',
+                'message': 'No answers provided',
+                'questions_answered': 0,
+                'duration_minutes': 0,
+                'detailed_feedback': []
+            }
         
         avg_score = sum(session['scores']) / len(session['scores'])
-        duration = time.time() - session['start_time']
+        duration_minutes = int((time.time() - session['start_time']) / 60)
         
+        # Determine performance level
         if avg_score >= 8:
-            performance = "Excellent"
-            message = "Outstanding performance! You're well-prepared for this role."
+            performance_level = "Excellent"
+            message = "Outstanding performance! You demonstrated strong knowledge and communication skills."
         elif avg_score >= 6:
-            performance = "Good"
-            message = "Solid performance with room for improvement in some areas."
+            performance_level = "Good"
+            message = "Good performance overall. With some practice, you can achieve excellence."
         elif avg_score >= 4:
-            performance = "Fair"
-            message = "Decent start, but significant preparation needed."
+            performance_level = "Fair"
+            message = "Fair performance. Focus on providing more detailed and structured answers."
         else:
-            performance = "Needs Improvement"
-            message = "Consider more preparation and practice before the actual interview."
+            performance_level = "Needs Improvement"
+            message = "Keep practicing! Consider researching common interview questions and the STAR method."
         
-        improvement_areas = []
-        for feedback in session['feedback']:
-            if 'weaknesses' in feedback:
-                improvement_areas.extend(feedback['weaknesses'])
-        
-        report = {
+        return {
             'overall_score': round(avg_score, 1),
-            'performance_level': performance,
+            'performance_level': performance_level,
             'message': message,
             'questions_answered': len(session['answers']),
-            'duration_minutes': round(duration / 60, 1),
-            'detailed_feedback': session['feedback'],
-            'improvement_areas': list(set(improvement_areas)),
-            'strengths': self._extract_strengths(session['feedback'])
+            'duration_minutes': duration_minutes,
+            'detailed_feedback': session['feedback']
         }
-        
-        return report
-    
-    def _extract_strengths(self, feedback_list: List[Dict]) -> List[str]:
-        strengths = []
-        for feedback in feedback_list:
-            if 'strengths' in feedback:
-                strengths.extend(feedback['strengths'])
-        return list(set(strengths))
-
-    def start_interview(self, user_data: Dict, interview_type: str, job_role: str) -> str:
-        job_description = f"{interview_type} for {job_role} position"
-        questions = self.groq_service.generate_interview_questions(job_description, user_data)
-        
-        if questions and len(questions) > 0:
-            return questions[0].get('question', 'Tell me about yourself and why you are interested in this position.')
-        return 'Tell me about yourself and why you are interested in this position.'
-    
-    def process_response(self, user_response: str, conversation_history: List[Dict]) -> tuple:
-        if len(conversation_history) < 3:  # Still early in interview
-            feedback = "Good start! Keep your answers concise and specific."
-            next_question = "What interests you most about this role and our company?"
-        elif len(conversation_history) < 5:
-            feedback = "Remember to provide specific examples from your experience."
-            next_question = "Can you tell me about a challenging project you worked on and how you handled it?"
-        else:
-            feedback = "Great progress! Try to highlight your achievements with quantifiable results."
-            next_question = "Do you have any questions for us about the role or company?"
-        
-        return next_question, feedback
-    
-    def end_interview(self, conversation_history: List[Dict]) -> str:
-        total_responses = len([msg for msg in conversation_history if msg['role'] == 'candidate'])
-        
-        feedback = f"""
-        **Interview Summary:**
-        
-        🎯 **Performance Overview:**
-        - Questions answered: {total_responses}
-        - Overall communication: Good
-        
-        💡 **Strengths demonstrated:**
-        - Active participation in the interview
-        - Willingness to engage with questions
-        
-        📈 **Areas for improvement:**
-        - Provide more specific examples
-        - Quantify achievements where possible
-        - Practice concise but comprehensive answers
-        
-        🚀 **Next steps:**
-        - Continue practicing interview skills
-        - Research the company and role thoroughly
-        - Prepare STAR method examples for behavioral questions
-        """
-        
-        return feedback
 
 class InterviewUI:
     def __init__(self, interview_simulator):
@@ -167,15 +113,27 @@ class InterviewUI:
         if st.button("Start Interview", type="primary"):
             if job_title:
                 if not job_description:
-                    job_description = f"{job_title} position at {company}. {experience_level} role requiring relevant experience and skills."
+                    job_description = f"{job_title} position at {company}. {experience_level} level. {interview_type} interview."
                 
                 user_background = st.session_state.get('user_data', {})
+                user_background.update({
+                    'target_job_title': job_title,
+                    'target_company': company,
+                    'experience_level': experience_level,
+                    'interview_type': interview_type
+                })
+                
                 session = self.simulator.start_interview_session(job_description, user_background)
-                st.session_state.interview_session = session
-                st.session_state.interview_active = True
-                st.rerun()
+                
+                if session and session.get('questions'):
+                    st.session_state.interview_session = session
+                    st.session_state.interview_active = True
+                    st.success("✅ Interview session created! Starting now...")
+                    st.experimental_rerun()
+                else:
+                    st.error("❌ Failed to create interview session. Please try again.")
             else:
-                st.error("Please provide at least a job title to start the interview.")
+                st.error("Please provide at least a job title.")
     
     def render_active_interview(self):
         session = st.session_state.interview_session
@@ -207,17 +165,17 @@ class InterviewUI:
                     evaluation = self.simulator.submit_answer(session, answer)
                     if evaluation:
                         st.session_state.last_evaluation = evaluation
-                        st.rerun()
+                        st.experimental_rerun()
         
         with col2:
             if st.button("Skip Question"):
                 self.simulator.submit_answer(session, "Skipped")
-                st.rerun()
+                st.experimental_rerun()
         
         with col3:
             if st.button("End Interview"):
                 st.session_state.interview_active = False
-                st.rerun()
+                st.experimental_rerun()
         
         if hasattr(st.session_state, 'last_evaluation') and st.session_state.last_evaluation:
             self.render_question_feedback(st.session_state.last_evaluation)
@@ -251,7 +209,7 @@ class InterviewUI:
                 for weakness in evaluation['weaknesses']:
                     st.write(f"• {weakness}")
         
-        if 'suggestions' in evaluation:
+        if evaluation.get('suggestions'):
             st.markdown("**💡 Suggestions:**")
             st.write(evaluation['suggestions'])
     
@@ -307,7 +265,7 @@ class InterviewUI:
                     del st.session_state.interview_active
                 if 'last_evaluation' in st.session_state:
                     del st.session_state.last_evaluation
-                st.rerun()
+                st.experimental_rerun()
         
         with col2:
             if st.button("Download Report"):
@@ -320,44 +278,25 @@ class InterviewUI:
                 )
     
     def _generate_report_text(self, report: Dict, session: Dict) -> str:
-        lines = [
-            "INTERVIEW PERFORMANCE REPORT",
-            "=" * 40,
-            f"Overall Score: {report['overall_score']}/10",
-            f"Performance Level: {report['performance_level']}",
-            f"Questions Answered: {report['questions_answered']}",
-            f"Duration: {report['duration_minutes']} minutes",
-            "",
-            "SUMMARY:",
-            report['message'],
-            "",
-            "DETAILED FEEDBACK:",
-            "-" * 20
-        ]
+        report_text = f"""INTERVIEW PERFORMANCE REPORT
+========================================
+Overall Score: {report['overall_score']}/10
+Performance Level: {report['performance_level']}
+Questions Answered: {report['questions_answered']}
+Duration: {report['duration_minutes']} minutes
+
+SUMMARY:
+{report['message']}
+
+DETAILED BREAKDOWN:
+"""
         
-        for i, feedback in enumerate(report['detailed_feedback']):
-            lines.extend([
-                f"",
-                f"Question {i + 1}:",
-                session['questions'][i]['question'],
-                f"Your Answer: {session['answers'][i]}",
-                f"Score: {feedback.get('score', 'N/A')}/10",
-                f"Feedback: {feedback.get('feedback', 'No feedback available')}",
-                "-" * 20
-            ])
+        for i, (question, answer, feedback) in enumerate(zip(session['questions'], session['answers'], report['detailed_feedback'])):
+            report_text += f"""
+Question {i + 1}: {question['question']}
+Your Answer: {answer}
+Score: {feedback.get('score', 'N/A')}/10
+Feedback: {feedback.get('feedback', 'No feedback available')}
+{'=' * 50}"""
         
-        if report['improvement_areas']:
-            lines.extend([
-                "",
-                "KEY IMPROVEMENT AREAS:",
-                *[f"• {area}" for area in report['improvement_areas']]
-            ])
-        
-        if report['strengths']:
-            lines.extend([
-                "",
-                "STRENGTHS DEMONSTRATED:",
-                *[f"• {strength}" for strength in report['strengths']]
-            ])
-        
-        return "\n".join(lines)
+        return report_text
