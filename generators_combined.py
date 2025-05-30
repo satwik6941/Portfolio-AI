@@ -1191,12 +1191,12 @@ class ResumeGenerator:
                         pdf.cell(0, 6, current_line.strip(), 0, 1)
                 else:
                     pdf.cell(0, 6, line, 0, 1)
-            else:
                 pdf.ln(3)
         
         pdf_output = pdf.output(dest='S')
         if isinstance(pdf_output, str):
-            return pdf_output.encode('latin-1')
+            # Use UTF-8 encoding with error handling instead of latin-1 to fix encoding issues
+            return pdf_output.encode('utf-8', errors='replace')
         else:
             return bytes(pdf_output)
 
@@ -1401,6 +1401,7 @@ Sincerely,
         
         pdf_output = pdf.output(dest='S')
         if isinstance(pdf_output, str):
-            return pdf_output.encode('latin-1')
+            # Use UTF-8 encoding with error handling instead of latin-1 to fix encoding issues
+            return pdf_output.encode('utf-8', errors='replace')
         else:
             return bytes(pdf_output)

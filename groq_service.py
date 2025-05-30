@@ -743,15 +743,14 @@ class GroqLLM:
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 return json.loads(json_str)
-        except:
-            return {
+        except:            return {
                 "match_percentage": 75,
                 "keyword_matches": 8,
                 "missing_skills": ["Review job requirements"],
                 "matching_skills": user_data.get('skills', [])[:5],
                 "recommendations": ["Tailor your resume to match job requirements"]
             }
-    
+
     def parse_resume_data(self, resume_text: str) -> Dict[str, Any]:
         prompt = f"""
         Extract and structure the following information from this resume text:
@@ -769,7 +768,15 @@ class GroqLLM:
             "experience": "Work experience summary",
             "education": "Educational background",
             "linkedin": "LinkedIn URL if found",
-            "location": "Location/Address if found"
+            "location": "Location/Address if found",
+            "projects": [
+                {{
+                    "title": "Project Name",
+                    "description": "Project description with key achievements and impact",
+                    "technologies": "Technologies used (if mentioned)",
+                    "duration": "Project duration or timeframe (if mentioned)"
+                }}
+            ]
         }}
         
         Guidelines:
@@ -777,9 +784,15 @@ class GroqLLM:
         2. For skills, create a list of individual skills
         3. For experience, provide a concise summary of work history
         4. For education, include degree, institution, and year if available
-        5. Use "Not found" for any missing information
-        6. Ensure valid JSON format
-        """
+        5. For projects, extract ALL projects mentioned in the resume including:
+           - Personal projects, academic projects, work projects
+           - Project names/titles
+           - Brief descriptions highlighting key achievements
+           - Technologies/tools used (if mentioned)
+           - Duration/timeframe (if mentioned)
+        6. Use "Not found" for any missing information
+        7. Use empty array [] for projects if none are found
+        8. Ensure valid JSON format        """
         
         messages = [
             {"role": "system", "content": "You are an expert resume parser that extracts structured data from resume text. Return only valid JSON."},
@@ -797,12 +810,16 @@ class GroqLLM:
                 
                 if 'skills' in parsed_data and isinstance(parsed_data['skills'], str):
                     parsed_data['skills'] = [skill.strip() for skill in parsed_data['skills'].split(',') if skill.strip()]
+                  # Ensure projects is properly structured
+                if 'projects' not in parsed_data:
+                    parsed_data['projects'] = []
+                elif not isinstance(parsed_data['projects'], list):
+                    parsed_data['projects'] = []
                 
                 return parsed_data
         except Exception as e:
             print(f"Error parsing resume data: {e}")
-            
-        return self._fallback_resume_parsing(resume_text)
+            return self._fallback_resume_parsing(resume_text)
     
     def _fallback_resume_parsing(self, resume_text: str) -> Dict[str, Any]:
         import re
@@ -816,7 +833,8 @@ class GroqLLM:
             "experience": "Not found",
             "education": "Not found",
             "linkedin": "Not found",
-            "location": "Not found"
+            "location": "Not found",
+            "projects": []
         }
         
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -849,6 +867,32 @@ class GroqLLM:
             if match:
                 parsed_data["experience"] = match.group()[:200] + "..."
                 break
+        
+        # Basic project extraction for fallback
+        project_keywords = ['project', 'built', 'developed', 'created', 'designed']
+        projects = []
+        
+        text_lines = resume_text.split('\n')
+        for i, line in enumerate(text_lines):
+            line = line.strip()
+            if any(keyword in line.lower() for keyword in project_keywords):
+                if len(line) > 10 and len(line) < 100:  # Reasonable project title length
+                    # Try to get description from next few lines
+                    description = ""
+                    for j in range(i+1, min(i+4, len(text_lines))):
+                        next_line = text_lines[j].strip()
+                        if next_line and len(next_line) > 20:
+                            description = next_line[:150]
+                            break
+                    
+                    projects.append({
+                        "title": line,
+                        "description": description if description else "Project details available upon request",
+                        "technologies": "Not specified",
+                        "duration": "Not specified"
+                    })
+        
+        parsed_data["projects"] = projects[:3]  # Limit to 3 projects for fallback
         
         return parsed_data
     

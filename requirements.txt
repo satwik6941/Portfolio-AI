@@ -14,3 +14,9 @@ schedule
 google-cloud-talent
 google-auth
 googlesearch-python
+lxml
+fake-useragent
+scrapy
+aiohttp
+asyncio
+concurrent.futures
