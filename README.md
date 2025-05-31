@@ -1,8 +1,6 @@
-# 🚀 AI Career Assistant
+🚀**ResuMate** – Your AI-powered resume and career companion
 
-## 📋 Overview
-
-An AI-powered career assistant web application that transforms your career with intelligent tools for:
+An open source LLM powered career assistant web application that transforms your career with intelligent tools for:
 
 - **📤 Resume Upload & Analysis** - AI-powered resume parsing and profile extraction
 - **🌐 Portfolio Generation** - Professional portfolios with AI-generated projects
@@ -12,6 +10,7 @@ An AI-powered career assistant web application that transforms your career with 
 - **🎤 Interview Simulation** - Chat-based AI interview practice with detailed feedback
 - **💬 Resume Chat** - Interactive AI assistant for resume improvement
 
+This application is powered by the open source LLM **LLama 70B-8192" model
 ---
 
 ## 🔧 Technical Details

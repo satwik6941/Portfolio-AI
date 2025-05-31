@@ -110,7 +110,7 @@ class GroqLLM:
                 term.upper() not in ['CEO', 'CTO', 'HR', 'IT']):
                 filtered_terms.append(term)
                 
-        return filtered_terms[:10]  
+        return filtered_terms[:10]
     
     def _get_term_explanation(self, term: str, search_query: str) -> str:
         try:
@@ -127,80 +127,168 @@ class GroqLLM:
             
             explanation = self._make_request(messages, max_tokens=100, temperature=0.3)
             return explanation if explanation and not explanation.startswith("❌") else ""
-            
         except Exception:
             return ""
 
     def generate_enhanced_cover_letter(self, user_data: Dict[str, Any], job_description: str, 
                                         company_name: str, tone: str = "Professional") -> str:
+        """Generate a fully dynamic, AI-driven cover letter based on extracted user data"""
         
-        search_results = self.search_unknown_terms(job_description, f"{company_name} job requirements")
+        # Enhanced AI analysis of user's background
+        user_skills = user_data.get('skills', [])
+        user_experience = user_data.get('experience', [])
+        user_projects = user_data.get('projects', [])
+        
+        # Create comprehensive context from user data
+        experience_context = ""
+        if user_experience:
+            experience_context = "\n📋 PROFESSIONAL EXPERIENCE:\n"
+            for exp in user_experience[:3]:  # Top 3 most relevant experiences
+                if isinstance(exp, dict):
+                    experience_context += f"• {exp.get('position', 'Professional')} at {exp.get('company', 'Company')}\n"
+                    experience_context += f"  Duration: {exp.get('duration', 'Previous role')}\n"
+                    experience_context += f"  Achievements: {exp.get('description', 'Professional experience')[:200]}...\n\n"
+        
+        projects_context = ""
+        if user_projects:
+            projects_context = "\n🚀 KEY PROJECTS:\n"
+            for project in user_projects[:3]:  # Top 3 projects
+                if isinstance(project, dict):
+                    projects_context += f"• {project.get('title', 'Project')}\n"
+                    projects_context += f"  Description: {project.get('description', 'Project details')[:150]}...\n"
+                    if project.get('technologies'):
+                        projects_context += f"  Technologies: {project.get('technologies')}\n"
+                    projects_context += "\n"
+        
+        skills_context = ""
+        if user_skills:
+            skills_context = f"\n🛠️ TECHNICAL SKILLS: {', '.join(user_skills[:15])}"
+        
+        # Research unknown terms and enhance with context
+        search_results = self.search_unknown_terms(job_description, f"{company_name} job requirements technical skills")
         
         search_context = ""
         if search_results:
-            search_context = "\n\nAdditional context from research:\n"
+            search_context = "\n\n🔬 INDUSTRY RESEARCH:\n"
             for term, explanation in search_results.items():
-                search_context += f"- {term}: {explanation}\n"
+                search_context += f"• {term}: {explanation}\n"
+        
+        # Dynamic analysis of job requirements vs user profile
+        job_analysis_prompt = f"""
+        Analyze this job description and identify:
+        1. Key technical requirements
+        2. Required experience level  
+        3. Company culture indicators
+        4. Essential soft skills
+        5. Industry-specific terminology
+        
+        Job Description: {job_description[:1000]}
+        
+        Return a brief analysis of what this role needs most.
+        """
+        
+        job_analysis = self._make_request([
+            {"role": "system", "content": "You are a job requirements analyst. Provide concise analysis."},
+            {"role": "user", "content": job_analysis_prompt}
+        ], max_tokens=300, temperature=0.3)
         
         prompt = f"""
-        Write a compelling, {tone.lower()} cover letter for:
+        Write a compelling, {tone.lower()} cover letter that demonstrates clear alignment between the candidate's background and the job requirements.
         
-        Candidate: {user_data.get('name', 'Candidate')}
+        🎯 TARGET ROLE: {company_name} - Position from job description
+        
+        👤 CANDIDATE PROFILE:
+        Name: {user_data.get('name', 'Candidate')}
         Current Title: {user_data.get('title', 'Professional')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
+        Location: {user_data.get('location', 'Available to relocate')}
+        Summary: {user_data.get('summary', 'Experienced professional')}
+        {skills_context}
+        {experience_context}
+        {projects_context}
         
-        Target Company: {company_name}
-        Job Description: {job_description}
-        Tone: {tone}
+        📋 JOB REQUIREMENTS ANALYSIS:
+        {job_analysis}
+        
+        📄 FULL JOB DESCRIPTION:
+        {job_description}
+        
         {search_context}
         
+        🎨 WRITING GUIDELINES:
         Create a personalized cover letter that:
-        1. Opens with a compelling hook specific to the company
-        2. Demonstrates clear understanding of the role and technical requirements
-        3. Highlights most relevant experience and achievements
-        4. Shows knowledge of company culture/values and industry trends
-        5. Includes specific examples and metrics
-        6. Uses industry terminology correctly (informed by research above)
-        7. Maintains {tone.lower()} tone throughout
-        8. Closes with strong call to action
-        9. Is 350-450 words
-            Make it highly personalized and compelling for this specific opportunity, incorporating the researched context naturally.
+        
+        1. **Opening Hook**: Start with a compelling connection to the company or role that shows research
+        2. **Skills Alignment**: Map specific user skills/experience to job requirements with concrete examples
+        3. **Project Showcase**: Highlight relevant projects that demonstrate required capabilities
+        4. **Company Knowledge**: Show understanding of company culture, recent news, or industry position
+        5. **Value Proposition**: Clearly articulate what unique value the candidate brings
+        6. **Technical Depth**: Include relevant technical terminology and concepts from research
+        7. **Achievement Focus**: Quantify accomplishments where possible from user's background
+        8. **Cultural Fit**: Demonstrate alignment with company values and work style
+        9. **Call to Action**: End with confidence and next steps
+        
+        📐 FORMATTING REQUIREMENTS:
+        - 350-450 words total
+        - {tone} tone throughout
+        - Natural integration of researched terminology
+        - Specific examples from user's actual background
+        - No generic statements or placeholders
+        - Professional but engaging language
+        
+        🚫 AVOID:
+        - Generic phrases like "I am writing to apply"
+        - Repetition of resume content without added insight
+        - Overly formal or robotic language
+        - Claims not supported by user's background
+        - Template-like structure
+        
+        Write as if you're the candidate, using their real experience and skills to create an authentic, compelling case for why they're the perfect fit for this specific role at this specific company.
         """
         
         messages = [
-            {"role": "system", "content": f"You are an expert career counselor who writes compelling, {tone.lower()} cover letters that get interviews. You have access to current industry knowledge and terminology."},
+            {"role": "system", "content": f"You are an expert career counselor who writes compelling, {tone.lower()} cover letters that get interviews. You have access to current industry knowledge and create highly personalized content."},
             {"role": "user", "content": prompt}
         ]
         
         return self._make_request(messages, max_tokens=1500, temperature=0.7)
 
     def generate_enhanced_resume(self, user_data: Dict[str, Any]) -> str:
-        enhancements = user_data.get('ai_enhancements', [])
+        """Generate a dynamic, fully AI-driven resume based on extracted user data"""
         style = user_data.get('resume_style', 'Professional ATS-Optimized')
         skills_input = user_data.get('skills_input', '')
         projects = user_data.get('projects', [])
         
-        search_context_text = f"{skills_input} {user_data.get('experience', '')} {user_data.get('title', '')}"
-        search_results = self.search_unknown_terms(search_context_text, "career skills technology")
+        # Enhanced AI analysis of user's background
+        all_content = f"""
+        {user_data.get('summary', '')} 
+        {skills_input} 
+        {user_data.get('experience', '')} 
+        {user_data.get('title', '')}
+        {' '.join([str(exp.get('description', '')) for exp in user_data.get('experience', []) if isinstance(exp, dict)])}
+        {' '.join([str(proj.get('description', '')) for proj in projects if isinstance(proj, dict)])}
+        """
+        
+        # Research unknown terms and enhance with context
+        search_results = self.search_unknown_terms(all_content, "career skills technology industry trends")
         
         search_context = ""
         if search_results:
-            search_context = "\n\nResearched technical context:\n"
+            search_context = "\n\n🔬 ENHANCED TECHNICAL KNOWLEDGE:\n"
             for term, explanation in search_results.items():
-                search_context += f"- {term}: {explanation}\n"
+                search_context += f"• {term}: {explanation}\n"
         
+        # Dynamic projects analysis
         projects_context = ""
         if projects:
-            projects_context = "\n\nProjects to include (format using STAR method):\n"
+            projects_context = "\n\n📚 PROJECTS TO SHOWCASE (Transform using STAR methodology):\n"
             for i, project in enumerate(projects, 1):
                 projects_context += f"\nProject {i}:\n"
-                projects_context += f"- Title: {project.get('title', 'Untitled Project')}\n"
-                projects_context += f"- Description: {project.get('description', 'No description provided')}\n"
+                projects_context += f"• Title: {project.get('title', 'Untitled Project')}\n"
+                projects_context += f"• Description: {project.get('description', 'No description provided')}\n"
                 if project.get('technologies'):
-                    projects_context += f"- Technologies: {project.get('technologies')}\n"
+                    projects_context += f"• Technologies: {project.get('technologies')}\n"
                 if project.get('duration'):
-                    projects_context += f"- Duration: {project.get('duration')}\n"
+                    projects_context += f"• Duration: {project.get('duration')}\n"
         
         prompt = f"""
         Create an enhanced, {style} resume for:
@@ -213,7 +301,6 @@ class GroqLLM:
         Experience: {user_data.get('experience', 'Professional experience')}
         Education: {user_data.get('education', 'Educational background')}
         
-        Apply these AI enhancements: {', '.join(enhancements)}
         {search_context}
         {projects_context}
           Create a professional resume with:
@@ -732,8 +819,7 @@ class GroqLLM:
         
         messages = [
             {"role": "system", "content": "You are an expert job match analyzer. Return only valid JSON."},
-            {"role": "user", "content": prompt}
-        ]
+            {"role": "user", "content": prompt}        ]
         
         response = self._make_request(messages, max_tokens=800, temperature=0.3)
         
@@ -743,7 +829,8 @@ class GroqLLM:
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 return json.loads(json_str)
-        except:            return {
+        except:
+            return {
                 "match_percentage": 75,
                 "keyword_matches": 8,
                 "missing_skills": ["Review job requirements"],
@@ -752,54 +839,122 @@ class GroqLLM:
             }
 
     def parse_resume_data(self, resume_text: str) -> Dict[str, Any]:
+        """Enhanced LLM-based resume parsing with comprehensive analysis"""
         prompt = f"""
-        Extract and structure the following information from this resume text:
-        
+        As an expert resume analyst, perform a comprehensive analysis and extraction of ALL information from this resume text. Extract every detail accurately and completely.
+
         Resume Text:
         {resume_text}
-        
-        Extract the following information and return as JSON:
+
+        Analyze the resume text thoroughly and extract ALL available information. Return a complete JSON structure:
         {{
-            "name": "Full Name",
+            "name": "Full Name (extract from header/contact section)",
             "email": "email@example.com",
-            "phone": "Phone Number",
-            "title": "Job Title/Professional Title",
-            "skills": ["skill1", "skill2", "skill3"],
-            "experience": "Work experience summary",
-            "education": "Educational background",
+            "phone": "Phone Number with formatting",
+            "title": "Current or target job title/professional title",
+            "location": "City, State/Country if found",
             "linkedin": "LinkedIn URL if found",
-            "location": "Location/Address if found",
+            "website": "Personal website/portfolio URL if found",
+            "summary": "Professional summary or objective statement if present",
+            "skills": ["comprehensive list of ALL skills mentioned including technical, soft, programming languages, frameworks, tools, certifications"],
+            "experience": [
+                {{
+                    "company": "Company Name",
+                    "position": "Job Title", 
+                    "duration": "Start Date - End Date",
+                    "location": "Work location if mentioned",
+                    "description": "Detailed job description with achievements and responsibilities",
+                    "achievements": ["List of specific achievements with metrics if available"]
+                }}
+            ],
+            "education": [
+                {{
+                    "institution": "University/School Name",
+                    "degree": "Degree Type and Major",
+                    "graduation_year": "Year or date",
+                    "gpa": "GPA if mentioned",
+                    "location": "Location if mentioned",
+                    "relevant_coursework": "Relevant courses if mentioned"
+                }}
+            ],
             "projects": [
                 {{
                     "title": "Project Name",
-                    "description": "Project description with key achievements and impact",
-                    "technologies": "Technologies used (if mentioned)",
-                    "duration": "Project duration or timeframe (if mentioned)"
+                    "description": "Comprehensive description of what was built/achieved",
+                    "technologies": "All technologies, frameworks, languages used",
+                    "duration": "Timeline or duration",
+                    "role": "Your role in the project",
+                    "achievements": "Key outcomes, metrics, impact",
+                    "links": "GitHub, demo, or project links if mentioned"
                 }}
-            ]
+            ],
+            "certifications": ["List of certifications with issuing organizations"],
+            "languages": ["Spoken languages with proficiency levels if mentioned"],
+            "publications": ["Research papers, articles, publications if any"],
+            "awards": ["Awards, honors, recognitions if any"],
+            "volunteer_experience": ["Volunteer work or community involvement"],
+            "additional_sections": {{
+                "interests": ["Hobbies and interests"],
+                "references": "Reference information if provided"
+            }}
         }}
-        
-        Guidelines:
-        1. Extract exact information from the resume
-        2. For skills, create a list of individual skills
-        3. For experience, provide a concise summary of work history
-        4. For education, include degree, institution, and year if available
-        5. For projects, extract ALL projects mentioned in the resume including:
-           - Personal projects, academic projects, work projects
-           - Project names/titles
-           - Brief descriptions highlighting key achievements
-           - Technologies/tools used (if mentioned)
-           - Duration/timeframe (if mentioned)
-        6. Use "Not found" for any missing information
-        7. Use empty array [] for projects if none are found
-        8. Ensure valid JSON format        """
+
+        CRITICAL EXTRACTION GUIDELINES:
+
+        1. **PROJECTS - Extract EVERYTHING that resembles a project:**
+           - Dedicated project sections
+           - Work projects mentioned in job descriptions
+           - Academic/thesis projects
+           - Personal/side projects
+           - Open source contributions
+           - Hackathon projects
+           - Portfolio pieces
+           - Apps, websites, tools, software developed
+           - Research projects
+           - Capstone projects
+           - Freelance work
+           - ANY mentions of building, creating, developing, designing, implementing
+
+        2. **SKILLS - Be exhaustive:**
+           - Programming languages (Python, Java, JavaScript, etc.)
+           - Frameworks and libraries (React, Django, TensorFlow, etc.)
+           - Tools and software (Git, Docker, AWS, Figma, etc.)
+           - Technical skills (Machine Learning, Data Analysis, etc.)
+           - Soft skills (Leadership, Communication, etc.)
+           - Industry-specific skills
+           - Certifications and qualifications
+
+        3. **EXPERIENCE - Extract complete work history:**
+           - Include internships, part-time jobs, freelance work
+           - Extract specific achievements with numbers/metrics
+           - Include all responsibilities and accomplishments
+
+        4. **EDUCATION - Complete academic background:**
+           - All degrees, diplomas, certificates
+           - Relevant coursework, thesis topics
+           - Academic achievements, GPA, honors
+
+        5. **Contact Information - Extract all available:**
+           - Full name, professional email, phone
+           - LinkedIn profile, personal website, GitHub
+           - Location/address information
+
+        6. **Quality Standards:**
+           - Extract exact text, don't paraphrase
+           - Include metrics, percentages, dollar amounts
+           - Preserve technical terminology
+           - Use "Not found" only if truly absent
+           - Ensure valid JSON with proper escaping
+
+        Analyze every line of the resume. Don't miss any information that could be valuable for career development.
+        """
         
         messages = [
-            {"role": "system", "content": "You are an expert resume parser that extracts structured data from resume text. Return only valid JSON."},
+            {"role": "system", "content": "You are an expert resume parser and career analyst. Perform comprehensive extraction of ALL resume information. Return only valid, complete JSON."},
             {"role": "user", "content": prompt}
         ]
         
-        response = self._make_request(messages, max_tokens=1000, temperature=0.3)
+        response = self._make_request(messages, max_tokens=2500, temperature=0.2)
         
         try:
             json_start = response.find('{')
@@ -807,19 +962,137 @@ class GroqLLM:
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 parsed_data = json.loads(json_str)
-                
-                if 'skills' in parsed_data and isinstance(parsed_data['skills'], str):
-                    parsed_data['skills'] = [skill.strip() for skill in parsed_data['skills'].split(',') if skill.strip()]
-                  # Ensure projects is properly structured
-                if 'projects' not in parsed_data:
-                    parsed_data['projects'] = []
-                elif not isinstance(parsed_data['projects'], list):
-                    parsed_data['projects'] = []
+                  # Process and validate extracted data
+                parsed_data = self._validate_and_enhance_parsed_data(parsed_data)
                 
                 return parsed_data
         except Exception as e:
-            print(f"Error parsing resume data: {e}")
+            print(f"Error parsing resume data with enhanced LLM: {e}")
             return self._fallback_resume_parsing(resume_text)
+    
+    def _validate_and_enhance_parsed_data(self, parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and enhance the parsed resume data"""
+        try:
+            # Ensure all required fields exist with proper defaults
+            required_fields = {
+                'name': 'Not found',
+                'email': 'Not found',
+                'phone': 'Not found',
+                'title': 'Not found',
+                'location': 'Not found',
+                'linkedin': 'Not found',
+                'website': 'Not found',
+                'summary': 'Not found',
+                'skills': [],
+                'experience': [],
+                'education': [],
+                'projects': [],
+                'certifications': [],
+                'languages': [],
+                'publications': [],
+                'awards': [],
+                'volunteer_experience': [],
+                'additional_sections': {}
+            }
+            
+            # Set defaults for missing fields
+            for field, default_value in required_fields.items():
+                if field not in parsed_data or parsed_data[field] is None:
+                    parsed_data[field] = default_value
+            
+            # Validate and clean skills
+            if isinstance(parsed_data.get('skills'), str):
+                parsed_data['skills'] = [skill.strip() for skill in parsed_data['skills'].split(',') if skill.strip()]
+            elif not isinstance(parsed_data.get('skills'), list):
+                parsed_data['skills'] = []
+            
+            # Ensure skills are unique and not empty
+            parsed_data['skills'] = list(set([skill for skill in parsed_data['skills'] if skill and isinstance(skill, str) and len(skill.strip()) > 1]))
+            
+            # Validate experience format
+            if not isinstance(parsed_data.get('experience'), list):
+                # If experience is a string, try to convert to basic structure
+                exp_text = str(parsed_data.get('experience', ''))
+                if exp_text and exp_text != 'Not found':
+                    parsed_data['experience'] = [{
+                        'company': 'Previous Experience',
+                        'position': 'Professional',
+                        'duration': 'Previous role',
+                        'description': exp_text[:300] + '...' if len(exp_text) > 300 else exp_text,
+                        'achievements': []
+                    }]
+                else:
+                    parsed_data['experience'] = []
+            
+            # Validate education format
+            if not isinstance(parsed_data.get('education'), list):
+                edu_text = str(parsed_data.get('education', ''))
+                if edu_text and edu_text != 'Not found':
+                    parsed_data['education'] = [{
+                        'institution': 'Educational Institution',
+                        'degree': edu_text[:100] + '...' if len(edu_text) > 100 else edu_text,
+                        'graduation_year': 'Not specified',
+                        'location': 'Not specified'
+                    }]
+                else:
+                    parsed_data['education'] = []
+            
+            # Validate projects format
+            if not isinstance(parsed_data.get('projects'), list):
+                parsed_data['projects'] = []
+            
+            # Clean and validate project entries
+            clean_projects = []
+            for project in parsed_data.get('projects', []):
+                if isinstance(project, dict) and project.get('title'):
+                    clean_project = {
+                        'title': str(project.get('title', 'Untitled Project'))[:100],
+                        'description': str(project.get('description', 'Project details available'))[:500],
+                        'technologies': str(project.get('technologies', 'Not specified'))[:200],
+                        'duration': str(project.get('duration', 'Not specified'))[:50],
+                        'role': str(project.get('role', 'Team Member'))[:100],
+                        'achievements': str(project.get('achievements', 'Successful completion'))[:300],
+                        'links': str(project.get('links', 'Not available'))[:200]
+                    }
+                    clean_projects.append(clean_project)
+            
+            parsed_data['projects'] = clean_projects[:10]  # Limit to 10 projects max
+            
+            # Clean string fields to prevent issues
+            string_fields = ['name', 'email', 'phone', 'title', 'location', 'linkedin', 'website', 'summary']
+            for field in string_fields:
+                if isinstance(parsed_data.get(field), str):
+                    parsed_data[field] = parsed_data[field].strip()
+                    if len(parsed_data[field]) > 500:  # Reasonable limit
+                        parsed_data[field] = parsed_data[field][:500] + '...'
+            
+            # Validate list fields
+            list_fields = ['certifications', 'languages', 'publications', 'awards', 'volunteer_experience']
+            for field in list_fields:
+                if not isinstance(parsed_data.get(field), list):
+                    parsed_data[field] = []
+                # Ensure all items are strings and reasonable length
+                parsed_data[field] = [str(item)[:200] for item in parsed_data[field] if item][:10]
+            
+            # Validate additional_sections
+            if not isinstance(parsed_data.get('additional_sections'), dict):
+                parsed_data['additional_sections'] = {}
+            
+            return parsed_data
+            
+        except Exception as e:
+            print(f"Error validating parsed data: {e}")
+            # Return minimal safe structure
+            return {
+                'name': 'Error in processing',
+                'email': 'Not found',
+                'phone': 'Not found',
+                'title': 'Not found',
+                'skills': [],
+                'experience': [],
+                'education': [],
+                'projects': []
+            }
     
     def _fallback_resume_parsing(self, resume_text: str) -> Dict[str, Any]:
         import re
@@ -867,32 +1140,101 @@ class GroqLLM:
             if match:
                 parsed_data["experience"] = match.group()[:200] + "..."
                 break
-        
-        # Basic project extraction for fallback
-        project_keywords = ['project', 'built', 'developed', 'created', 'designed']
+          # Enhanced project extraction for fallback
+        project_sections = ['project', 'portfolio', 'work', 'experience', 'academic', 'capstone', 'research']
+        project_keywords = [
+            'built', 'developed', 'created', 'designed', 'implemented', 'programmed',
+            'website', 'application', 'app', 'system', 'tool', 'platform', 'dashboard',
+            'analysis', 'model', 'algorithm', 'database', 'api', 'software', 'solution'
+        ]
         projects = []
         
+        # Split text into sections and lines for analysis
         text_lines = resume_text.split('\n')
+        current_section = ""
+        
         for i, line in enumerate(text_lines):
             line = line.strip()
+            
+            # Identify project sections
+            if any(section in line.lower() for section in project_sections) and len(line) < 50:
+                current_section = line.lower()
+                continue
+            
+            # Look for project indicators
             if any(keyword in line.lower() for keyword in project_keywords):
-                if len(line) > 10 and len(line) < 100:  # Reasonable project title length
-                    # Try to get description from next few lines
-                    description = ""
-                    for j in range(i+1, min(i+4, len(text_lines))):
-                        next_line = text_lines[j].strip()
-                        if next_line and len(next_line) > 20:
-                            description = next_line[:150]
+                if len(line) > 10 and len(line) < 150:  # Reasonable project title/description length
+                    # Extract title (try to clean it up)
+                    title = line
+                    if title.startswith('•') or title.startswith('-') or title.startswith('*'):
+                        title = title[1:].strip()
+                    
+                    # Try to get more comprehensive description from surrounding lines
+                    description_parts = []
+                    
+                    # Look at current line and next few lines for description
+                    for j in range(i, min(i+4, len(text_lines))):
+                        desc_line = text_lines[j].strip()
+                        if desc_line and len(desc_line) > 15:
+                            # Clean up bullet points
+                            if desc_line.startswith('•') or desc_line.startswith('-') or desc_line.startswith('*'):
+                                desc_line = desc_line[1:].strip()
+                            
+                            # Add to description if it's substantial
+                            if any(tech_word in desc_line.lower() for tech_word in ['using', 'with', 'implemented', 'achieved', 'resulted']):
+                                description_parts.append(desc_line)
+                    
+                    description = " ".join(description_parts[:2]) if description_parts else title
+                    
+                    # Try to extract technologies mentioned nearby
+                    technologies = []
+                    tech_keywords = [
+                        'python', 'javascript', 'java', 'react', 'node', 'html', 'css', 'sql',
+                        'mongodb', 'postgresql', 'django', 'flask', 'express', 'angular', 'vue',
+                        'git', 'docker', 'aws', 'azure', 'gcp', 'tensorflow', 'pytorch', 'pandas',
+                        'numpy', 'scikit', 'tableau', 'powerbi', 'excel', 'r', 'matlab', 'c++', 'c#'
+                    ]
+                    
+                    # Look for technologies in the description and surrounding text
+                    search_text = " ".join(text_lines[max(0, i-1):min(len(text_lines), i+3)]).lower()
+                    for tech in tech_keywords:
+                        if tech in search_text:
+                            technologies.append(tech.capitalize())
+                    
+                    # Extract duration if mentioned
+                    duration = "Not specified"
+                    duration_patterns = [
+                        r'\d+\s*months?', r'\d+\s*weeks?', r'\d+\s*years?',
+                        r'(spring|summer|fall|winter)\s*\d{4}',
+                        r'\d{4}\s*-\s*\d{4}', r'\d{1,2}/\d{4}\s*-\s*\d{1,2}/\d{4}'
+                    ]
+                    for pattern in duration_patterns:
+                        match = re.search(pattern, search_text, re.IGNORECASE)
+                        if match:
+                            duration = match.group()
                             break
                     
-                    projects.append({
-                        "title": line,
-                        "description": description if description else "Project details available upon request",
-                        "technologies": "Not specified",
-                        "duration": "Not specified"
-                    })
+                    # Only add if it looks like a legitimate project
+                    if len(title) > 5 and not title.lower().startswith('experience'):
+                        projects.append({
+                            "title": title[:100],  # Limit title length
+                            "description": description[:300] if description else "Project details available upon request",
+                            "technologies": ", ".join(technologies[:5]) if technologies else "Not specified",
+                            "duration": duration
+                        })
         
-        parsed_data["projects"] = projects[:3]  # Limit to 3 projects for fallback
+        # Remove duplicates and limit results
+        unique_projects = []
+        seen_titles = set()
+        for project in projects:
+            title_lower = project['title'].lower()
+            if title_lower not in seen_titles and len(title_lower) > 3:
+                seen_titles.add(title_lower)
+                unique_projects.append(project)
+                if len(unique_projects) >= 5:  # Limit to 5 projects for fallback
+                    break
+        
+        parsed_data["projects"] = unique_projects
         
         return parsed_data
     
@@ -940,8 +1282,7 @@ class GroqLLM:
         
         Make it professional, compelling, and tailored to showcase their unique value proposition.
         Use modern, engaging language and highlight quantifiable achievements where possible.
-        Return only valid JSON.
-        """
+        Return only valid JSON.        """
         
         messages = [
             {"role": "system", "content": "You are a professional portfolio writer. Create structured portfolio data in JSON format only."},
@@ -951,15 +1292,44 @@ class GroqLLM:
         try:
             response = self._make_request(messages, max_tokens=2500, temperature=0.8)
             
-            # Try to parse JSON response
+            # Clean and extract JSON response with better error handling
             json_start = response.find('{')
             json_end = response.rfind('}') + 1
+            
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
-                portfolio_data = json.loads(json_str)
-                return portfolio_data
+                
+                # Clean the JSON string to fix common issues
+                json_str = json_str.strip()
+                # Fix trailing commas before closing braces/brackets
+                json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+                # Ensure proper quote escaping
+                json_str = json_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                
+                try:
+                    portfolio_data = json.loads(json_str)
+                    
+                    # Validate and clean the portfolio data structure
+                    if not isinstance(portfolio_data, dict):
+                        raise ValueError("Portfolio data is not a dictionary")
+                    
+                    # Ensure required fields exist with defaults
+                    portfolio_data.setdefault('headline', f"{user_data.get('title', 'Professional')} | Technology Expert")
+                    portfolio_data.setdefault('about', 'Experienced professional with a passion for innovation')
+                    portfolio_data.setdefault('skills', user_data.get('skills', []))
+                    portfolio_data.setdefault('projects', [])
+                    portfolio_data.setdefault('experience', [])
+                    portfolio_data.setdefault('education', user_data.get('education', ''))
+                    portfolio_data.setdefault('certifications', [])
+                    
+                    return portfolio_data
+                    
+                except json.JSONDecodeError as json_error:
+                    print(f"JSON parsing error: {str(json_error)}")
+                    print(f"Problematic JSON: {json_str[:500]}...")
+                    return self._create_fallback_portfolio(user_data)
             else:
-                # Fallback if JSON parsing fails
+                print("No valid JSON found in response")
                 return self._create_fallback_portfolio(user_data)
                 
         except Exception as e:

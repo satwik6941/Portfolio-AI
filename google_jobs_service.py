@@ -1,12 +1,14 @@
 import os
 import requests
 import json
+import os
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from google.cloud import talent
 from google.oauth2 import service_account
 import logging
 import re
+import random
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,9 +17,25 @@ class GoogleJobsService:
     def __init__(self, project_id: str = None, credentials_path: str = None):
         self.project_id = project_id or os.getenv('GOOGLE_CLOUD_PROJECT_ID')
         self.credentials_path = credentials_path or os.getenv('GOOGLE_CLOUD_CREDENTIALS_PATH')
-        
         self.client = None
         self.parent = None
+        
+        # Initialize AI data service for fallback
+        self.ai_data_service = None
+        try:
+            import os
+            from dotenv import load_dotenv
+            from ai_data_service import AIDataService
+            load_dotenv()
+            api_key = os.getenv("GROQ_API_KEY")
+            if api_key:
+                self.ai_data_service = AIDataService(api_key)
+                logger.info("✅ AI data service initialized for Google Jobs fallback")
+            else:
+                logger.warning("⚠️ No GROQ_API_KEY found for AI data service")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize AI data service: {e}")
+            self.ai_data_service = None
         
         try:
             if self.credentials_path and os.path.exists(self.credentials_path):
@@ -224,7 +242,7 @@ class GoogleJobsService:
             if skill.lower() in description_lower:
                 found_skills.append(skill)
         
-        return found_skills[:8]  
+        return found_skills[:8]
     
     def _estimate_company_size(self, company_name: str) -> str:
         large_companies = ['google', 'microsoft', 'amazon', 'apple', 'facebook', 'meta', 'netflix', 'tesla']
@@ -241,104 +259,52 @@ class GoogleJobsService:
         
         if not addresses or any('remote' in addr.lower() for addr in addresses):
             return "Remote-friendly"
-        
         return None
     
     def _create_fallback_job_data(self) -> Dict:
-        return {
-            'title': 'Software Developer',
-            'company': 'Tech Company',
-            'location': 'Remote',
-            'description': 'Exciting software development opportunity',
-            'employment_type': 'Full-time',
-            'posted_date': 'Recently',
-            'url': '#',
-            'salary': 'Competitive salary',
-            'requirements': ['Bachelor\'s degree', 'Programming experience'],
-            'skills': ['Python', 'JavaScript'],
-            'source': 'google_talent_api',
-            'job_id': 'fallback',
-            'company_size': 'Medium (201-1000)',
-            'remote_type': None
-        }
+        # Instead of hardcoded fallback, return None to indicate failure
+        # This will prompt the system to use AI-generated opportunities instead
+        return None
     
     def _get_mock_jobs(self, query: str, location: str, limit: int) -> List[Dict]:
-        mock_jobs = [
+        """Enhanced fallback method using AI-powered job generation"""
+        try:
+            # Try AI-powered job generation first
+            if self.ai_data_service:
+                logger.info("🤖 Using AI data service for dynamic job generation")
+                ai_jobs = self.ai_data_service.generate_dynamic_jobs(
+                    query=query or "software developer",
+                    location=location or "Remote",
+                    count=limit
+                )
+                if ai_jobs:
+                    return ai_jobs
+        except Exception as e:
+            logger.warning(f"AI job generation failed: {e}")
+        
+        # Minimal static fallback for complete AI failure
+        logger.info("⚡ Using minimal static fallback jobs")
+        return self._get_minimal_fallback_jobs(query, location, limit)
+    
+    def _get_minimal_fallback_jobs(self, query: str, location: str, limit: int) -> List[Dict]:
+        """Minimal static fallback for complete system failure"""
+        basic_jobs = [
             {
-                'title': 'Senior Software Engineer',
-                'company': 'TechCorp Solutions',
-                'location': location or 'San Francisco, CA',
-                'description': 'Join our innovative team to build cutting-edge software solutions using modern technologies.',
-                'employment_type': 'FULL_TIME',
-                'posted_date': 'Today',
-                'url': '#',
-                'salary': 'USD 120,000 - 150,000',
-                'requirements': ['5+ years experience', 'Computer Science degree', 'Strong coding skills'],
-                'skills': ['Python', 'React', 'AWS', 'Docker']
-            },
-            {
-                'title': 'Full Stack Developer',
-                'company': 'StartupHub Inc',
-                'location': location or 'New York, NY',
-                'description': 'Build end-to-end web applications in a fast-paced startup environment.',
-                'employment_type': 'FULL_TIME',
-                'posted_date': '2 days ago',
-                'url': '#',
-                'salary': 'USD 90,000 - 120,000',
-                'requirements': ['3+ years experience', 'Bachelor\'s degree', 'Full stack development'],
-                'skills': ['JavaScript', 'Node.js', 'React', 'MongoDB']
-            },
-            {
-                'title': 'Frontend Developer',
-                'company': 'Digital Agency Pro',
+                'title': 'Software Developer',
+                'company': 'Tech Company',
                 'location': location or 'Remote',
-                'description': 'Create beautiful, responsive user interfaces using modern frontend frameworks.',
-                'employment_type': 'CONTRACT',
-                'posted_date': '1 week ago',
-                'url': '#',
-                'salary': 'USD 70 - 90 per hour',
-                'requirements': ['2+ years experience', 'Portfolio required', 'UI/UX knowledge'],
-                'skills': ['React', 'TypeScript', 'CSS', 'Figma']
-            },
-            {
-                'title': 'Data Scientist',
-                'company': 'AI Innovations Lab',
-                'location': location or 'Boston, MA',
-                'description': 'Analyze complex datasets and build machine learning models to drive business insights.',
+                'description': 'Exciting software development opportunity',
                 'employment_type': 'FULL_TIME',
-                'posted_date': '3 days ago',
+                'posted_date': 'Recently',
                 'url': '#',
-                'salary': 'USD 100,000 - 140,000',
-                'requirements': ['PhD/Masters preferred', '3+ years ML experience', 'Statistical analysis'],
-                'skills': ['Python', 'Machine Learning', 'SQL', 'TensorFlow']
-            },
-            {
-                'title': 'DevOps Engineer',
-                'company': 'CloudFirst Technologies',
-                'location': location or 'Seattle, WA',
-                'description': 'Design and maintain scalable cloud infrastructure and deployment pipelines.',
-                'employment_type': 'FULL_TIME',
-                'posted_date': '5 days ago',
-                'url': '#',
-                'salary': 'USD 110,000 - 135,000',
-                'requirements': ['4+ years DevOps experience', 'Cloud certifications preferred', 'Automation expertise'],
-                'skills': ['AWS', 'Docker', 'Kubernetes', 'Terraform']
+                'salary': 'Competitive',
+                'requirements': ['Programming experience'],
+                'skills': ['Programming', 'Problem Solving'],
+                'source': 'google_jobs_api',
+                'ai_generated': False
             }
         ]
-        
-        if query:
-            query_lower = query.lower()
-            filtered_jobs = []
-            for job in mock_jobs:
-                if (query_lower in job['title'].lower() or 
-                    query_lower in job['description'].lower() or
-                    any(query_lower in skill.lower() for skill in job['skills'])):
-                    filtered_jobs.append(job)
-            
-            if filtered_jobs:
-                return filtered_jobs[:limit]
-        
-        return mock_jobs[:limit]
+        return basic_jobs[:limit]
 
     def get_job_recommendations(self, user_skills: List[str], location: str = "", experience_level: str = "") -> List[Dict]:
         if not user_skills:
@@ -351,6 +317,21 @@ class GoogleJobsService:
         return self.search_jobs(skills_query, location, limit=15, employment_types=employment_types)
     
     def get_trending_jobs(self, location: str = "") -> List[Dict]:
+        """Enhanced trending jobs with AI-powered generation"""
+        try:
+            # Try AI-powered trending jobs first
+            if self.ai_data_service:
+                logger.info("🤖 Using AI data service for trending jobs")
+                ai_trending = self.ai_data_service.generate_trending_jobs(
+                    location=location or "Remote",
+                    count=12
+                )
+                if ai_trending:
+                    return ai_trending
+        except Exception as e:
+            logger.warning(f"AI trending jobs failed: {e}")
+        
+        # Fallback to query-based search
         trending_queries = [
             "AI engineer machine learning",
             "cloud engineer AWS",
@@ -368,7 +349,7 @@ class GoogleJobsService:
                 logger.error(f"Error fetching trending jobs for query '{query}': {str(e)}")
                 continue
         
-        return all_jobs[:12]  
+        return all_jobs[:12]
     
     def search_jobs_by_company(self, company_names: List[str], location: str = "") -> List[Dict]:
         all_jobs = []
@@ -398,8 +379,22 @@ class GoogleJobsService:
         except Exception as e:
             logger.error(f"Error fetching job details for ID '{job_id}': {str(e)}")
             return None
-    
     def get_salary_insights(self, job_title: str, location: str = "") -> Dict:
+        """Enhanced salary insights with AI-powered data generation"""
+        try:
+            # Try AI-powered salary insights first
+            if self.ai_data_service:
+                logger.info("🤖 Using AI data service for salary insights")
+                ai_insights = self.ai_data_service.generate_salary_insights(
+                    job_title=job_title,
+                    location=location or "All locations"
+                )
+                if ai_insights:
+                    return ai_insights
+        except Exception as e:
+            logger.warning(f"AI salary insights failed: {e}")
+        
+        # Fallback to job search analysis
         try:
             jobs = self.search_jobs(job_title, location, limit=50)
             

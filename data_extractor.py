@@ -8,8 +8,7 @@ import re
 import json
 import os
 from typing import Dict, List, Optional
-# Import google_jobs_service only when needed to avoid blocking
-# from google_jobs_service import GoogleJobsService
+from ai_data_service import AIDataService
 
 class DataExtractor:
     def __init__(self):
@@ -67,6 +66,7 @@ class DataExtractor:
             return {'error': f'Could not extract LinkedIn data: {e}'}
 
 def parse_resume_data(text: str) -> Dict:
+        """Enhanced resume parsing with improved education and project extraction"""
         data = {
             'name': '',
             'email': '',
@@ -77,16 +77,19 @@ def parse_resume_data(text: str) -> Dict:
             'projects': []
         }
         
+        # Email extraction
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         emails = re.findall(email_pattern, text)
         if emails:
             data['email'] = emails[0]
         
+        # Phone extraction
         phone_pattern = r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'
         phones = re.findall(phone_pattern, text)
         if phones:
             data['phone'] = ''.join(phones[0]) if isinstance(phones[0], tuple) else phones[0]
 
+        # Name extraction
         lines = text.split('\n')
         for line in lines[:5]:  
             line = line.strip()
@@ -95,51 +98,278 @@ def parse_resume_data(text: str) -> Dict:
                     data['name'] = line
                     break
         
+        # Enhanced skill extraction
         skill_keywords = [
             'Python', 'JavaScript', 'Java', 'C++', 'React', 'Node.js', 'SQL',
             'Machine Learning', 'Data Analysis', 'Project Management', 'Leadership',
-            'Communication', 'Problem Solving', 'Teamwork'
+            'Communication', 'Problem Solving', 'Teamwork', 'HTML', 'CSS', 'PHP',
+            'Ruby', 'Swift', 'Kotlin', 'Go', 'Rust', 'Docker', 'Kubernetes', 'AWS',
+            'Azure', 'GCP', 'MongoDB', 'PostgreSQL', 'Redis', 'Git', 'Linux'
         ]
         
         for skill in skill_keywords:
             if skill.lower() in text.lower():
                 data['skills'].append(skill)
         
-        # Basic project extraction
-        project_keywords = ['project', 'built', 'developed', 'created', 'designed']
-        projects = []
+        # Enhanced education extraction with section detection
+        data['education'] = _extract_education_section(text)
         
-        text_lines = text.split('\n')
-        for i, line in enumerate(text_lines):
-            line = line.strip()
-            if any(keyword in line.lower() for keyword in project_keywords):
-                if len(line) > 10 and len(line) < 100:  # Reasonable project title length
-                    # Try to get description from next few lines
-                    description = ""
-                    for j in range(i+1, min(i+4, len(text_lines))):
-                        next_line = text_lines[j].strip()
-                        if next_line and len(next_line) > 20:
-                            description = next_line[:150]
-                            break
-                    
-                    projects.append({
-                        "title": line,
-                        "description": description if description else "Project details available upon request",
-                        "technologies": "Not specified",
-                        "duration": "Not specified"
-                    })
-        
-        data['projects'] = projects[:3]  # Limit to 3 projects for basic extraction
+        # Enhanced project extraction with section detection
+        data['projects'] = _extract_projects_enhanced(text)
         
         return data
 
+def _extract_education_section(text: str) -> str:
+    """Extract education information by looking for education headings and content"""
+    education_headings = [
+        'education', 'academic background', 'qualifications', 'degrees',
+        'university', 'college', 'school', 'certification', 'training'
+    ]
+    
+    lines = text.split('\n')
+    education_content = []
+    in_education_section = False
+    section_started = False
+    
+    for i, line in enumerate(lines):
+        line_lower = line.strip().lower()
+        
+        # Check if this line is an education heading
+        if any(heading in line_lower for heading in education_headings):
+            if len(line.strip()) < 50:  # Likely a heading, not content
+                in_education_section = True
+                section_started = True
+                continue
+        
+        # Check if we've moved to a different section
+        other_sections = ['experience', 'work', 'employment', 'skills', 'projects', 'summary']
+        if in_education_section and any(section in line_lower for section in other_sections):
+            if len(line.strip()) < 50:  # Likely a new section heading
+                break
+        
+        # If we're in education section, collect content
+        if in_education_section and line.strip():
+            # Look for degree indicators
+            degree_indicators = ['bachelor', 'master', 'phd', 'diploma', 'certificate', 'degree', 'university', 'college']
+            if any(indicator in line_lower for indicator in degree_indicators):
+                education_content.append(line.strip())
+            elif section_started and len(line.strip()) > 10:
+                education_content.append(line.strip())
+    
+    if education_content:
+        return ' | '.join(education_content[:3])  # Limit to 3 most relevant entries
+    
+    # Fallback: look for degree patterns anywhere in text
+    degree_patterns = [
+        r'(Bachelor|Master|PhD|B\.?[AS]|M\.?[AS]|Ph\.?D\.?).*?(?:in|of).*?(?:\d{4}|\n)',
+        r'(University|College).*?(?:\d{4}|\n)',
+        r'(GPA|CGPA).*?(?:\d\.\d|\n)'
+    ]
+    
+    for pattern in degree_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            return ' | '.join(matches[:2])
+    
+    return "Not found"
+
+def _extract_projects_enhanced(text: str) -> List[Dict]:
+    """Enhanced project extraction with better section detection and duplicate prevention"""
+    project_headings = [
+        'projects', 'personal projects', 'academic projects', 'side projects',
+        'portfolio', 'work samples', 'capstone', 'thesis', 'research',
+        'open source', 'github', 'repositories'
+    ]
+    
+    lines = text.split('\n')
+    projects = []
+    in_project_section = False
+    current_project = None
+    project_buffer = []  # Buffer to collect project-related lines
+    
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+        line_lower = line_stripped.lower()
+        
+        # Check if this line is a project section heading
+        if any(heading in line_lower for heading in project_headings):
+            if len(line_stripped) < 50 and not any(char.isdigit() for char in line_stripped):  # Likely a heading
+                in_project_section = True
+                # Save any pending project
+                if current_project and current_project.get('title'):
+                    projects.append(current_project)
+                    current_project = None
+                continue
+        
+        # Check if we've moved to a different section
+        other_sections = ['experience', 'work history', 'employment', 'skills', 'education', 'summary', 'contact']
+        if in_project_section and any(section in line_lower for section in other_sections):
+            if len(line_stripped) < 50 and ':' not in line_stripped:  # Likely a new section heading
+                if current_project and current_project.get('title'):
+                    projects.append(current_project)
+                in_project_section = False
+                break
+        
+        # If we're in project section, parse projects
+        if in_project_section and line_stripped:
+            # Improved project title detection
+            is_project_title = (
+                # Bullet points with substantial content
+                (line_stripped.startswith(('•', '-', '*', '◦')) and len(line_stripped) > 15) or
+                # Numbered lists
+                re.match(r'^\d+\.?\s+[A-Z][a-zA-Z\s]{5,}', line_stripped) or
+                # Bold/emphasized text (common in resumes)
+                (line_stripped.isupper() and 10 < len(line_stripped) < 60) or
+                # Lines that look like titles (short, starts with capital, no common description words)
+                (15 < len(line_stripped) < 60 and 
+                 line_stripped[0].isupper() and
+                 not line_stripped.startswith(('technologies', 'duration', 'tools', 'skills', 'using', 'developed', 'built', 'created')) and
+                 not line_stripped.endswith((',', '.', ':')) and
+                 not any(word in line_lower for word in ['implemented', 'designed', 'worked', 'responsible']))
+            )
+            
+            # Start new project if it's clearly a title
+            if is_project_title:
+                # Save previous project if exists and has meaningful content
+                if current_project and current_project.get('title') and len(current_project['title']) > 5:
+                    projects.append(current_project)
+                
+                # Clean the title
+                title = line_stripped.lstrip('•-*◦0123456789. ').strip()
+                current_project = {
+                    "title": title,
+                    "description": "",
+                    "technologies": "Not specified",
+                    "duration": "Not specified"
+                }
+                project_buffer = [line_stripped]
+            
+            # Add content to current project
+            elif current_project:
+                project_buffer.append(line_stripped)
+                
+                # Build description from action-oriented lines
+                if any(word in line_lower for word in ['developed', 'built', 'created', 'implemented', 'designed', 'worked on', 'responsible for']):
+                    if not current_project['description']:
+                        current_project['description'] = line_stripped
+                    else:
+                        current_project['description'] += " " + line_stripped
+                
+                # Extract technologies - look for tech-related keywords
+                tech_indicators = ['technologies', 'tech stack', 'using', 'built with', 'tools', 'languages', 'frameworks']
+                if any(indicator in line_lower for indicator in tech_indicators):
+                    tech_line = line_stripped
+                    # Clean up the technologies line
+                    for prefix in ['technologies:', 'tech stack:', 'using:', 'built with:', 'tools:', 'languages:', 'frameworks:']:
+                        if prefix in tech_line.lower():
+                            tech_line = tech_line.lower().replace(prefix, '').strip()
+                            break
+                    
+                    if tech_line and len(tech_line) > 3 and current_project['technologies'] == "Not specified":
+                        current_project['technologies'] = tech_line.title()
+                  # Extract duration with better patterns
+                duration_patterns = [
+                    r'(\d+\s*(?:months?|weeks?|years?))',
+                    r'(\d{4}\s*-\s*\d{4})',
+                    r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\s*-\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}',
+                    r'(\d{1,2}/\d{4}\s*-\s*\d{1,2}/\d{4})'
+                ]
+                for pattern in duration_patterns:
+                    duration_match = re.search(pattern, line_stripped, re.IGNORECASE)
+                    if duration_match and current_project['duration'] == "Not specified":
+                        current_project['duration'] = duration_match.group(1)
+                        break
+        
+        # Check for projects outside dedicated sections (more conservative)
+        elif not in_project_section:
+            # Only treat as project if it starts with clear project indicators
+            project_starters = ['project:', 'key project:', 'major project:']
+            if any(starter in line_lower for starter in project_starters) and len(line_stripped) > 20:
+                title = line_stripped
+                for starter in project_starters:
+                    if starter in title.lower():
+                        title = title.lower().replace(starter, '').strip()
+                        break
+                
+                if current_project and current_project.get('title'):
+                    projects.append(current_project)
+                
+                current_project = {
+                    "title": title[:50] + "..." if len(title) > 50 else title,
+                    "description": "Project details available upon request",
+                    "technologies": "Not specified", 
+                    "duration": "Not specified"
+                }
+    
+    # Add the last project if it exists
+    if current_project and current_project.get('title') and len(current_project['title']) > 5:
+        projects.append(current_project)
+    
+    # Enhanced cleaning and deduplication
+    cleaned_projects = []
+    seen_titles = set()
+    
+    for project in projects:
+        if not project.get('title'):
+            continue
+            
+        title_lower = project['title'].lower().strip()
+        
+        # Skip very short, generic, or duplicate titles
+        if (len(project['title']) < 5 or 
+            title_lower in seen_titles or
+            title_lower in ['project', 'projects', 'work', 'experience']):
+            continue
+        
+        # Skip if title contains only common words
+        common_words = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an']
+        title_words = title_lower.split()
+        if len(title_words) > 0 and all(word in common_words for word in title_words):
+            continue
+        
+        # Skip titles that are clearly not projects
+        skip_patterns = ['technologies:', 'skills:', 'duration:', 'responsible for', 'worked on']
+        if any(pattern in title_lower for pattern in skip_patterns):
+            continue
+        
+        seen_titles.add(title_lower)
+        
+        # Ensure all fields have proper values
+        if not project.get('description') or project['description'].strip() == "":
+            project['description'] = "Project details available upon request"
+        
+        if not project.get('technologies') or project['technologies'] == "":
+            project['technologies'] = "Not specified"
+            
+        if not project.get('duration') or project['duration'] == "":
+            project['duration'] = "Not specified"
+        
+        cleaned_projects.append(project)
+    
+    return cleaned_projects[:5]  # Limit to 5 most relevant projects
+
 class JobSearcher:
-    def __init__(self, jobs_api_key: str = None):
-        self.jobs_api_key = jobs_api_key
+    def __init__(self):
         self.job_scraper = None
         self.scraper_available = False
         self.job_cache = {}  # Cache for performance
-          # Initialize the new Beautiful Soup job scraper
+        
+        # Initialize AI data service
+        self.ai_data_service = None
+        try:
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()
+            api_key = os.getenv("GROQ_API_KEY")
+            if api_key:
+                self.ai_data_service = AIDataService(api_key)
+            else:
+                print("⚠️ No GROQ_API_KEY found for AI data service")
+        except Exception as e:
+            print(f"⚠️ Could not initialize AI data service: {e}")
+            self.ai_data_service = None
+        
+        # Initialize the new Beautiful Soup job scraper
         self._initialize_job_scraper()
     
     def _initialize_job_scraper(self):
@@ -151,7 +381,7 @@ class JobSearcher:
             print("✅ Job scraper initialized successfully - now using latest job postings!")
         except Exception as e:
             print(f"⚠️ Job scraper initialization failed: {str(e)}")
-            print("Job search will use fallback methods")
+            print("Job search will use AI-powered fallback methods")
             self.job_scraper = None
             self.scraper_available = False
     
@@ -234,8 +464,7 @@ class JobSearcher:
                 return self.google_jobs_api.get_job_recommendations(user_skills, location)
         except Exception as e:
             print(f"Error getting job recommendations: {str(e)}")
-        
-        # Fallback to regular search
+          # Fallback to regular search
         skills_query = " ".join(user_skills[:3]) if user_skills else "software developer"
         return self.search_jobs(skills_query, location, limit=10)
     
@@ -246,23 +475,54 @@ class JobSearcher:
                 return self.google_jobs_api.get_trending_jobs(location)
         except Exception as e:
             print(f"Error getting trending jobs: {str(e)}")
-        
-        # Fallback trending searches
+          # Fallback trending searches
         return self._fallback_trending_search(location)
     
     def _fallback_trending_search(self, location: str) -> List[Dict]:
-        """Fallback method for trending jobs"""
-        trending_queries = [
-            "AI engineer", "cloud engineer", "full stack developer", 
-            "data scientist", "DevOps engineer"
+        """AI-powered dynamic trending jobs generation"""
+        try:
+            # Use AI data service for trending jobs
+            trending_jobs = self.ai_data_service.generate_dynamic_jobs(
+                keywords="trending technology roles",
+                location=location,
+                experience_level="",
+                job_type="Full-time",
+                limit=12
+            )
+            
+            if trending_jobs and len(trending_jobs) > 0:
+                # Mark these as trending jobs
+                for job in trending_jobs:
+                    job['source'] = 'ai_trending'
+                    job['trending'] = True
+                    job['posted_date'] = 'Today' if len(trending_jobs) > 6 else '1 day ago'
+                
+                print(f"✅ Generated {len(trending_jobs)} AI-powered trending jobs")
+                return trending_jobs
+            else:
+                return self._minimal_trending_fallback(location)
+                
+        except Exception as e:
+            print(f"⚠️ AI trending jobs generation failed: {e}")
+            return self._minimal_trending_fallback(location)
+    
+    def _minimal_trending_fallback(self, location: str) -> List[Dict]:
+        """Minimal trending jobs fallback"""
+        return [
+            {
+                'title': 'AI/ML Engineer - High Demand',
+                'company': 'Tech Innovators Inc',
+                'location': location or 'Remote',
+                'description': 'Join the AI revolution! Work on cutting-edge machine learning solutions.',
+                'employment_type': 'FULL_TIME',
+                'posted_date': 'Today',
+                'url': '#',
+                'salary': 'Competitive - Above Market Rate',
+                'requirements': ['Machine Learning experience', 'Python proficiency'],
+                'skills': ['Python', 'TensorFlow', 'PyTorch', 'AI/ML'],                'source': 'minimal_trending',
+                'trending': True
+            }
         ]
-        
-        all_jobs = []
-        for query in trending_queries[:3]:
-            jobs = self._fallback_search(query, location, "", 3)
-            all_jobs.extend(jobs)
-        
-        return all_jobs[:12]
     
     def get_salary_insights(self, job_title: str, location: str = "") -> Dict:
         """Get salary insights for a job title and location"""
@@ -309,111 +569,61 @@ class JobSearcher:
             'median_salary': adjusted_salary,
             'min_salary': int(adjusted_salary * 0.7),
             'max_salary': int(adjusted_salary * 1.4),
-            'sample_size': 50,
-            'job_title': job_title,
+            'sample_size': 50,            'job_title': job_title,
             'location': location or 'All locations'
         }
     
     def _fallback_search(self, keywords: str, location: str, experience_level: str, job_type: str, limit: int) -> List[Dict]:
-        """Fallback job search when LinkedIn API fails"""
-        
-        experience_titles = {
-            'Entry Level (0-2 years)': ['Junior', 'Associate', 'Entry-Level'],
-            'Mid Level (3-5 years)': ['', 'Mid-Level', 'Specialist'],
-            'Senior Level (6-10 years)': ['Senior', 'Lead', 'Principal'],
-            'Executive (10+ years)': ['Director', 'VP', 'Chief', 'Head of']
-        }
-        
-        title_prefixes = experience_titles.get(experience_level, [''])
-        
-        mock_jobs = []
-        companies = [
-            {'name': 'Google', 'industry': 'Technology', 'size': 'Large'},
-            {'name': 'Microsoft', 'industry': 'Technology', 'size': 'Large'},
-            {'name': 'Amazon', 'industry': 'E-commerce', 'size': 'Large'},
-            {'name': 'Stripe', 'industry': 'Fintech', 'size': 'Medium'},
-            {'name': 'Airbnb', 'industry': 'Travel', 'size': 'Medium'},
-            {'name': 'Figma', 'industry': 'Design', 'size': 'Small'},
-            {'name': 'OpenAI', 'industry': 'AI', 'size': 'Medium'},
-            {'name': 'Tesla', 'industry': 'Automotive', 'size': 'Large'}
-        ]
-        
-        locations = [
-            'San Francisco, CA', 'New York, NY', 'Seattle, WA', 'Austin, TX',
-            'Remote', 'Los Angeles, CA', 'Chicago, IL', 'Boston, MA'
-        ]
-        
-        for i in range(min(limit, 15)):
-            company = companies[i % len(companies)]
-            prefix = title_prefixes[i % len(title_prefixes)] if title_prefixes[0] else ''
-            job_location = location if location else locations[i % len(locations)]
+        """Enhanced AI-powered fallback job search"""
+        try:
+            # Use AI data service for dynamic job generation
+            ai_jobs = self.ai_data_service.generate_dynamic_jobs(
+                keywords=keywords,
+                location=location,
+                experience_level=experience_level,
+                job_type=job_type,
+                limit=limit
+            )
             
-            job_descriptions = [
-                f"Join our innovative team working on cutting-edge {keywords} solutions. We're looking for passionate individuals who want to make a real impact.",
-                f"Exciting opportunity to work with {keywords} technologies in a fast-paced, collaborative environment. Strong growth opportunities and competitive benefits.",
-                f"We're seeking a talented {keywords} professional to help build the future of our platform. Remote-friendly culture with excellent work-life balance.",
-                f"Lead {keywords} initiatives at one of the most exciting companies in {company['industry']}. Opportunity to work with world-class talent."
-            ]
-            
-            salary_ranges = {
-                'Entry Level (0-2 years)': ['$70,000 - $100,000', '$65,000 - $95,000', '$75,000 - $105,000'],
-                'Mid Level (3-5 years)': ['$100,000 - $140,000', '$95,000 - $135,000', '$110,000 - $150,000'],
-                'Senior Level (6-10 years)': ['$140,000 - $200,000', '$135,000 - $190,000', '$150,000 - $220,000'],
-                'Executive (10+ years)': ['$200,000 - $350,000', '$250,000 - $400,000', '$300,000 - $500,000']
-            }
-              # Determine employment type based on job_type selection
-            if job_type == "Internships":
-                employment_type = "Internship"
-                title_suffix = "Intern"
-            elif job_type == "Full-time Jobs":
-                employment_type = "Full-time"
-                title_suffix = keywords
-            else:  # Both Jobs & Internships
-                employment_type = "Internship" if i % 3 == 0 else "Full-time"
-                title_suffix = "Intern" if employment_type == "Internship" else keywords
-            
-            # Define diverse application platforms
-            platforms = [
-                {'name': 'LinkedIn', 'url': f'https://www.linkedin.com/jobs/view/{1000000 + i}', 'icon': '💼'},
-                {'name': 'Indeed', 'url': f'https://www.indeed.com/viewjob?jk=job{i}', 'icon': '🔍'},
-                {'name': 'Glassdoor', 'url': f'https://www.glassdoor.com/job-listing/job{i}', 'icon': '🏢'},
-                {'name': 'AngelList', 'url': f'https://angel.co/jobs/{i}', 'icon': '👼'},
-                {'name': 'Company Website', 'url': f'https://careers.{company["name"].lower().replace(" ", "")}.com/apply/{i}', 'icon': '🌐'},
-                {'name': 'ZipRecruiter', 'url': f'https://www.ziprecruiter.com/jobs/{i}', 'icon': '⚡'},
-                {'name': 'Monster', 'url': f'https://www.monster.com/job/{i}', 'icon': '👹'},
-                {'name': 'CareerBuilder', 'url': f'https://www.careerbuilder.com/job/{i}', 'icon': '🔨'}
-            ]
-            
-            # Select platform for this job
-            platform = platforms[i % len(platforms)]
-            
-            job = {
-                'id': f'job_{platform["name"].lower()}_{i}',
-                'title': f"{prefix} {title_suffix} {'Engineer' if i % 2 == 0 else 'Developer'}".strip(),
-                'company': company['name'],
-                'company_industry': company['industry'],
-                'company_size': company['size'],
-                'location': job_location,
-                'description': job_descriptions[i % len(job_descriptions)],
-                'employment_type': employment_type,
-                'experience_level': experience_level or 'Mid Level',
-                'posted_date': self._get_recent_date(i),
-                'linkedin_url': f'https://www.linkedin.com/jobs/view/{1000000 + i}',
-                'application_url': platform['url'],
-                'application_platform': platform['name'],
-                'platform_icon': platform['icon'],
-                'salary_range': salary_ranges.get(experience_level, salary_ranges['Mid Level (3-5 years)'])[i % 3],
-                'remote_type': 'Remote' in job_location or i % 4 == 0,
-                'skills': self._generate_relevant_skills(keywords),
-                'benefits': self._generate_benefits(),
-                'requirements': self._generate_requirements(keywords, experience_level),
-                'source': 'enhanced_fallback',
-                'ai_match_score': 85 + (i % 15)  # Simulated AI match score
-            }
-            
-            mock_jobs.append(job)
+            if ai_jobs and len(ai_jobs) > 0:
+                print(f"✅ Generated {len(ai_jobs)} AI-powered job listings")
+                return ai_jobs
+            else:
+                print("⚠️ AI job generation returned empty, using minimal fallback")
+                return self._minimal_hardcoded_fallback(keywords, location, limit)
+                
+        except Exception as e:
+            print(f"⚠️ AI job generation failed: {e}, using minimal fallback")
+            return self._minimal_hardcoded_fallback(keywords, location, limit)
+    
+    def _minimal_hardcoded_fallback(self, keywords: str, location: str, limit: int) -> List[Dict]:
+        """Minimal hardcoded fallback when all AI systems fail"""
+        companies = ["TechFlow Solutions", "DataDrive Inc", "CloudNext Corp", "InnovateLabs"]
+        locations = ["Remote", "San Francisco, CA", "New York, NY", "Seattle, WA"]
         
-        return mock_jobs
+        jobs = []
+        for i in range(min(limit, 8)):
+            jobs.append({
+                'id': f'minimal_fallback_{i}',
+                'title': f"{keywords} Developer" if keywords else "Software Developer",
+                'company': companies[i % len(companies)],
+                'company_industry': 'Technology',
+                'company_size': 'Medium',
+                'location': location or locations[i % len(locations)],
+                'description': f'Work on innovative {keywords} solutions in a collaborative environment.',
+                'employment_type': 'Full-time',
+                'experience_level': 'Mid Level',
+                'posted_date': f'{(i % 7) + 1} days ago',
+                'url': '#',
+                'application_url': '#',
+                'salary_range': '$90,000 - $130,000',
+                'requirements': [f'{keywords} experience', 'Problem-solving skills', 'Team collaboration'],
+                'skills': [keywords or 'Programming', 'Git', 'Agile'],
+                'benefits': ['Health insurance', 'Remote work', 'Professional development'],
+                'remote_type': 'Remote' if i % 2 == 0 else 'On-site',                'source': 'minimal_fallback',
+                'ai_match_score': 80
+            })
+        return jobs
     
     def _get_recent_date(self, days_ago: int) -> str:
         from datetime import datetime, timedelta

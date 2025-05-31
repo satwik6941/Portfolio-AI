@@ -20,6 +20,23 @@ class JobScraper:
         })
         self.rate_limit_delay = 1  # Seconds between requests
         
+        # Initialize AI data service for enhanced fallback methods
+        self.ai_data_service = None
+        try:
+            import os
+            from dotenv import load_dotenv
+            from ai_data_service import AIDataService
+            load_dotenv()
+            api_key = os.getenv("GROQ_API_KEY")
+            if api_key:
+                self.ai_data_service = AIDataService(api_key)
+                logger.info("✅ AI data service initialized for job scraper fallback")
+            else:
+                logger.warning("⚠️ No GROQ_API_KEY found for AI data service")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize AI data service: {e}")
+            self.ai_data_service = None
+        
     def _make_request(self, url: str, params: Dict = None) -> Optional[BeautifulSoup]:
         """Make a rate-limited request to avoid being blocked"""
         try:
@@ -386,18 +403,71 @@ class JobScraper:
             return 'Yesterday'
         else:
             return f'{days_ago} days ago'
-    
-    # Fallback methods for when scraping fails
+      # Fallback methods for when scraping fails
     def _fallback_indeed_jobs(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Fallback Indeed jobs when scraping fails"""
+        """Enhanced fallback Indeed jobs with AI-powered generation"""
+        try:
+            # Try AI-powered job generation first
+            if self.ai_data_service:
+                logger.info("🤖 Using AI data service for Indeed fallback jobs")
+                ai_jobs = self.ai_data_service.generate_dynamic_jobs(
+                    query=keywords or "software developer",
+                    location=location or "Remote",
+                    count=limit
+                )
+                if ai_jobs:
+                    # Mark as Indeed source
+                    for job in ai_jobs:
+                        job['source'] = 'indeed_ai_fallback'
+                    return ai_jobs
+        except Exception as e:
+            logger.warning(f"AI Indeed fallback failed: {e}")
+        
+        # Static fallback for complete AI failure
         return self._generate_realistic_jobs('indeed', keywords, location, limit)
     
     def _fallback_linkedin_jobs(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Fallback LinkedIn jobs"""
+        """Enhanced fallback LinkedIn jobs with AI-powered generation"""
+        try:
+            # Try AI-powered job generation first
+            if self.ai_data_service:
+                logger.info("🤖 Using AI data service for LinkedIn fallback jobs")
+                ai_jobs = self.ai_data_service.generate_dynamic_jobs(
+                    query=keywords or "software developer",
+                    location=location or "Remote",
+                    count=limit
+                )
+                if ai_jobs:
+                    # Mark as LinkedIn source
+                    for job in ai_jobs:
+                        job['source'] = 'linkedin_ai_fallback'
+                    return ai_jobs
+        except Exception as e:
+            logger.warning(f"AI LinkedIn fallback failed: {e}")
+        
+        # Static fallback for complete AI failure
         return self._generate_realistic_jobs('linkedin', keywords, location, limit)
     
     def _fallback_glassdoor_jobs(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Fallback Glassdoor jobs when scraping fails"""
+        """Enhanced fallback Glassdoor jobs with AI-powered generation"""
+        try:
+            # Try AI-powered job generation first
+            if self.ai_data_service:
+                logger.info("🤖 Using AI data service for Glassdoor fallback jobs")
+                ai_jobs = self.ai_data_service.generate_dynamic_jobs(
+                    query=keywords or "software developer",
+                    location=location or "Remote",
+                    count=limit
+                )
+                if ai_jobs:
+                    # Mark as Glassdoor source
+                    for job in ai_jobs:
+                        job['source'] = 'glassdoor_ai_fallback'
+                    return ai_jobs
+        except Exception as e:
+            logger.warning(f"AI Glassdoor fallback failed: {e}")
+        
+        # Static fallback for complete AI failure
         return self._generate_realistic_jobs('glassdoor', keywords, location, limit)
     
     def _generate_realistic_jobs(self, source: str, keywords: str, location: str, limit: int) -> List[Dict]:
