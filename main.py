@@ -15,219 +15,797 @@ from interview_simulator import InterviewSimulator, InterviewUI
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-try:
-    if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
-        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    else:
-        print("Warning: Tesseract not found at default location. OCR functionality may be limited.")
-except Exception as e:
-    print(f"Warning: Could not set Tesseract path: {e}")
+st.markdown('''
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-st.set_page_config(
-    page_title="AI Career Assistant",
-    page_icon="🚀",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+/* Global App Styling */
+body, .stApp {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%) !important;
+    font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
+    color: #f8fafc;
+}
 
-def clear_session_data():
-    if hasattr(st.session_state, 'user_data'):
-        st.session_state.user_data = {}
-    if hasattr(st.session_state, 'qa_completed'):
-        st.session_state.qa_completed = False
-    if hasattr(st.session_state, 'verification_completed'):
-        st.session_state.verification_completed = False
-    if hasattr(st.session_state, 'interview_active'):
-        st.session_state.interview_active = False
-    if hasattr(st.session_state, 'interview_messages'):
-        st.session_state.interview_messages = []
+/* Main content area */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.6) 100%);
+    border-radius: 24px;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    margin: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
 
-def initialize_services():
-    try:
-        if not GROQ_API_KEY:
-            st.error("Please set GROQ_API_KEY in your .env file")
-            return None, None, None, None, None, None, None
-        
-        groq_service = GroqLLM(GROQ_API_KEY)
-        data_extractor = DataExtractor()
-        portfolio_gen = PortfolioGenerator()
-        resume_gen = ResumeGenerator()
-        cover_letter_gen = CoverLetterGenerator()
-        job_searcher = JobSearcher()  # Remove jobs API key dependency
-        interview_sim = InterviewSimulator(groq_service)
-        
-        return groq_service, data_extractor, portfolio_gen, resume_gen, cover_letter_gen, job_searcher, interview_sim
-    except Exception as e:
-        st.error(f"Error initializing services: {str(e)}")
-        return None, None, None, None, None, None, None
+/* Override Streamlit default text colors */
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
+    color: #f8fafc !important;
+}
 
-def convert_usd_to_inr(usd_amount: float, exchange_rate: float = 83.0) -> float:
-    return usd_amount * exchange_rate
+.stApp p, .stApp div, .stApp span, .stApp label {
+    color: #e2e8f0 !important;
+}
 
-def format_salary_in_inr(salary_str: str) -> str:
-    if not salary_str or salary_str == "Not specified":
-        return salary_str
+/* Markdown text styling */
+.stMarkdown {
+    color: #e2e8f0 !important;
+}
+
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    color: #f8fafc !important;
+}
+
+/* Enhanced Sidebar with Glass Morphism */
+[data-testid="stSidebar"] {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 50%, rgba(51, 65, 85, 0.95) 100%) !important;
+    backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.37);
+}
+
+[data-testid="stSidebar"] > div {
+    background: transparent !important;
+}
+
+/* Sidebar Title Styling */
+.sidebar-title {
+    color: #10b981 !important;
+    font-size: 1.8rem;
+    font-weight: 800;
+    text-align: center;
+    padding: 0.8rem 0.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    background-color: rgba(16, 185, 129, 0.05);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+    text-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+/* Sidebar User Card */
+.sidebar-user-card {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 20px;
+    padding: 1.5rem 1.2rem;
+    margin-bottom: 2rem;
+    color: #f8fafc;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.15);
+    transition: all 0.3s ease;
+}
+
+.sidebar-user-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.2);
+}
+
+/* Navigation Radio Buttons */
+[data-testid="stSidebar"] .stRadio > div {
+    gap: 0.5rem;
+}
+
+[data-testid="stSidebar"] .stRadio > div > label {
+    background: rgba(16, 185, 129, 0.1) !important;
+    color: #e2e8f0 !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    border-radius: 12px !important;
+    padding: 0.8rem 1rem !important;
+    margin-bottom: 0.5rem !important;
+    font-size: 1.05rem !important;
+    font-weight: 500 !important;
+    transition: all 0.3s ease !important;
+    backdrop-filter: blur(10px) !important;
+    cursor: pointer !important;
+}
+
+[data-testid="stSidebar"] .stRadio > div > label:hover {
+    background: rgba(16, 185, 129, 0.2) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+    transform: translateX(4px) !important;
+}
+
+[data-testid="stSidebar"] .stRadio > div > label[data-checked="true"] {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Modern Card Styling */
+.card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+    color: #f8fafc;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+/* Card text styling */
+.card h1, .card h2, .card h3, .card h4, .card h5, .card h6 {
+    color: #f8fafc !important;
+}
+
+.card p, .card div, .card span, .card label {
+    color: #e2e8f0 !important;
+}
+
+/* Enhanced Button Styling */
+.stButton > button {
+    background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+    transition: all 0.3s ease;
+    text-transform: none;
+}
+
+.stButton > button:hover {
+    background: linear-gradient(135deg, #047857 0%, #065f46 50%, #064e3b 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(16, 185, 129, 0.35);
+}
+
+.stButton > button:active {
+    transform: translateY(0px);
+}
+
+/* Input Field Styling */
+.stTextInput > div > input, 
+.stTextArea > div > textarea,
+.stSelectbox > div > div > input,
+.stNumberInput > div > input {
+    border-radius: 12px;
+    border: 2px solid rgba(16, 185, 129, 0.3) !important;
+    background: rgba(30, 41, 59, 0.9) !important;
+    color: #f8fafc !important;
+    font-size: 1.05rem;
+    padding: 0.8rem 1.2rem;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.stTextInput > div > input:focus,
+.stTextArea > div > textarea:focus,
+.stSelectbox > div > div > input:focus,
+.stNumberInput > div > input:focus {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3) !important;
+    outline: none !important;
+    background: rgba(30, 41, 59, 1) !important;
+}
+
+/* Placeholder text styling */
+.stTextInput > div > input::placeholder,
+.stTextArea > div > textarea::placeholder {
+    color: #94a3b8 !important;
+}
+
+/* Select box styling */
+.stSelectbox > div > div {
+    background: rgba(30, 41, 59, 0.9) !important;
+    border: 2px solid rgba(16, 185, 129, 0.3) !important;
+    border-radius: 12px !important;
+    color: #f8fafc !important;
+}
+
+.stSelectbox > div > div > div {
+    color: #f8fafc !important;
+    background: rgba(30, 41, 59, 0.9) !important;
+}
+
+/* Dropdown options */
+.stSelectbox [data-baseweb="select"] > div {
+    background: rgba(30, 41, 59, 0.95) !important;
+    color: #f8fafc !important;
+}
+
+/* Text area specific styling */
+.stTextArea > div > textarea {
+    min-height: 120px !important;
+    resize: vertical !important;
+}
+
+/* Alert and Feedback Styling */
+.stAlert {
+    border-radius: 16px;
+    font-size: 1.08rem;
+    border: none;
+    backdrop-filter: blur(10px);
+}
+
+.stSuccess {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+    border-left: 4px solid #10b981;
+    color: #065f46;
+}
+
+.stError {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+    border-left: 4px solid #ef4444;
+    color: #991b1b;
+}
+
+.stWarning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+}
+
+.stInfo {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+    border-left: 4px solid #3b82f6;
+    color: #1d4ed8;
+}
+
+/* Expander and Tab Styling */
+.stExpander {
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+}
+
+.stTabs {
+    background: transparent;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: rgba(148, 163, 184, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: #64748b;
+    font-weight: 500;
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+/* Metrics Enhancement */
+.stMetric {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.stMetric:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+}
+
+/* File Uploader Styling */
+.stFileUploader {
+    border: 2px dashed rgba(16, 185, 129, 0.3);
+    border-radius: 16px;
+    background: rgba(16, 185, 129, 0.05);
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stFileUploader:hover {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+/* Progress Bar */
+.stProgress > div > div {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 6px;
+}
+
+/* Selectbox Styling */
+.stSelectbox > div > div {
+    border-radius: 12px;
+    border: 2px solid rgba(148, 163, 184, 0.3);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+}
+
+/* Hide Streamlit Branding */
+footer {visibility: hidden;}
+.viewerBadge_container__1QSob {visibility: hidden;}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(148, 163, 184, 0.1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+}
+
+/* Additional Enhancements for Better UX */
+
+/* Loading Animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.loading-pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Smooth transitions for interactive elements */
+* {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced form styling */
+.stForm {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%) !important;
+    border-radius: 20px !important;
+    padding: 2rem !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+    color: #f8fafc !important;
+}
+
+/* Enhanced checkbox and radio styling */
+.stCheckbox > label, .stRadio > label {
+    font-weight: 500 !important;
+    color: #e2e8f0 !important;
+}
+
+.stCheckbox > div > label > div,
+.stRadio > div > label > div {
+    color: #e2e8f0 !important;
+}
+
+/* File uploader styling */
+.stFileUploader {
+    border: 2px dashed rgba(16, 185, 129, 0.5) !important;
+    border-radius: 16px !important;
+    background: rgba(30, 41, 59, 0.7) !important;
+    padding: 2rem !important;
+    text-align: center !important;
+    transition: all 0.3s ease !important;
+    color: #e2e8f0 !important;
+}
+
+.stFileUploader:hover {
+    border-color: #10b981 !important;
+    background: rgba(30, 41, 59, 0.9) !important;
+}
+
+.stFileUploader > div > div > div {
+    color: #e2e8f0 !important;
+}
+
+/* Upload button styling */
+.stFileUploader button {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+}
+
+/* Success message styling */
+.success-message {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 16px;
+    padding: 1.5rem;
+    color: #065f46;
+    font-weight: 500;
+}
+
+/* Modern tooltip styling */
+[data-testid="stTooltipHoverTarget"] {
+    color: #10b981;
+}
+
+/* Enhanced spinner */
+.stSpinner > div {
+    border-color: #10b981 !important;
+}
+
+/* Better link styling */
+a {
+    color: #10b981;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: #047857;
+    text-decoration: underline;
+}
+
+/* Column spacing improvements */
+.row-widget.stHorizontal > div {
+    padding-right: 1rem;
+}
+
+/* Image styling improvements */
+img {
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+}
+
+/* DataEditor and DataFrame styling */
+.stDataEditor, .stDataFrame {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+}
+
+/* Chart container styling */
+.stPlotlyChart {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    padding: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* Additional text visibility fixes */
+.stApp [data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+/* Fix all text elements in main content */
+.main .element-container div, 
+.main .element-container p,
+.main .element-container span,
+.main .element-container label {
+    color: #e2e8f0 !important;
+}
+
+/* Ensure headers are visible */
+.main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
+    color: #f8fafc !important;
+    font-weight: 600 !important;
+}
+
+/* Subheader styling */
+.stSubheader {
+    color: #cbd5e1 !important;
+}
+
+/* Column text styling */
+.stColumn div, .stColumn p, .stColumn span {
+    color: #e2e8f0 !important;
+}
+
+/* Caption text */
+.stCaption {
+    color: #94a3b8 !important;
+}
+
+/* Success/Error message text visibility */
+.stSuccess div, .stError div, .stWarning div, .stInfo div {
+    color: inherit !important;
+}
+
+/* Expander text */
+.stExpander div, .stExpander p, .stExpander span {
+    color: #e2e8f0 !important;
+}
+
+/* Tab text */
+.stTabs div, .stTabs p, .stTabs span {
+    color: #e2e8f0 !important;
+}
+
+/* Metric text */
+.stMetric {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%) !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    color: #f8fafc !important;
+}
+
+.stMetric div, .stMetric span {
+    color: #f8fafc !important;
+}
+
+/* Code block styling */
+.stCode {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    color: #e2e8f0 !important;
+}
+
+/* JSON display styling */
+.stJson {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Ensure label text is visible */
+label {
+    color: #e2e8f0 !important;
+    font-weight: 500 !important;
+}
+
+/* Fix widget labels */
+.stWidget > label {
+    color: #e2e8f0 !important;
+}
+
+/* Progress text */
+.stProgress div {
+    color: #e2e8f0 !important;
+}
+
+/* Slider text */
+.stSlider div {
+    color: #e2e8f0 !important;
+}
+
+/* Number input styling */
+.stNumberInput label {
+    color: #e2e8f0 !important;
+}
+
+/* Date input styling */
+.stDateInput label, .stTimeInput label {
+    color: #e2e8f0 !important;
+}
+
+/* All divs inside main content area */
+.main [data-testid="stVerticalBlock"] div {
+    color: #e2e8f0 !important;
+}
+
+/* Force all text in main to be visible */
+.main * {
+    color: #e2e8f0 !important;
+}
+
+.main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
+    color: #f8fafc !important;
+}
+
+/* Additional text visibility fixes for specific elements */
+[data-testid="stText"], [data-testid="stMarkdown"] {
+    color: #e2e8f0 !important;
+}
+
+/* Fix any remaining text elements */
+.stApp p, .stApp span, .stApp div:not([data-testid="stSidebar"]) {
+    color: #e2e8f0 !important;
+}
+
+/* Ensure title text is always visible */
+h1, h2, h3, h4, h5, h6 {
+    color: #f8fafc !important;
+}
+</style>
+''', unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown('''
+    <div class="sidebar-title">
+        ResuMate - AI Career Assistant
+    </div>
+    ''', unsafe_allow_html=True)
     
+    st.markdown('''
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                    width: 80px; height: 80px; border-radius: 20px; 
+                    display: inline-flex; align-items: center; justify-content: center;
+                    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+                    border: 2px solid rgba(16, 185, 129, 0.2);">
+            <span style="font-size: 2.5rem;">🎯</span>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+    
+    user = st.session_state.get('user_data', {})
+    if user.get('name') and user.get('email'):
+        st.markdown(f'''
+        <div class="sidebar-user-card">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                            width: 45px; height: 45px; border-radius: 12px; 
+                            display: flex; align-items: center; justify-content: center;
+                            font-size: 1.2rem; font-weight: 700; color: white;">
+                    {user.get('name', 'U')[0].upper()}
+                </div>
+                <div>
+                    <div style="font-size: 1.15rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.2rem;">
+                        {user.get('name', 'User')}
+                    </div>
+                    <div style="font-size: 0.9rem; color: #94a3b8;">
+                        {user.get('title', 'Professional')}
+                    </div>
+                </div>
+            </div>
+            <div style="font-size: 0.85rem; color: #cbd5e1; padding: 0.5rem 0.8rem; 
+                        background: rgba(148, 163, 184, 0.1); border-radius: 8px; margin-top: 0.8rem;">
+                📧 {user.get('email', 'email@example.com')}
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    st.markdown('''
+    <style>
+    /* Override default radio button styling for navigation */
+    .nav-container .stRadio > div {
+        gap: 0.3rem;
+    }
+    </style>
+    <div class="nav-container">
+    ''', unsafe_allow_html=True)
+    
+    page = st.radio(
+        "",
+        [
+            "📤 Data Input",
+            "💬 Chat with Resume", 
+            "🌐 Portfolio Generator",
+            "📄 Resume Generator",
+            "✉️ Cover Letter Generator",
+            "🔍 Job Search",
+            "🎤 Interview Simulator",
+        ],
+        key="main_nav_radio",
+        label_visibility="collapsed"
+    )
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("""
+<div style='text-align: center; margin-bottom: 1.5rem; padding: 1.5rem 1rem;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+            border-radius: 24px; border: 1px solid rgba(16, 185, 129, 0.3);
+            backdrop-filter: blur(20px);'>
+    <h1 style='font-size: 2.8rem; font-weight: 800; 
+                color: #f8fafc !important;
+                text-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+                margin-bottom: 0.5rem; letter-spacing: -0.5px;'>
+        ResuMate - AI Career Assistant
+    </h1>
+    <div style='font-size: 1.3rem; color: #cbd5e1; font-weight: 500; max-width: 600px; margin: 0 auto;'>
+        Transform your career journey with cutting-edge AI tools for portfolios, resumes, and interview preparation
+    </div>
+    <div style='margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;'>
+        <span style='background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                    color: white; padding: 0.4rem 1rem; border-radius: 20px; 
+                    font-size: 0.9rem; font-weight: 600;'>
+            ✨ AI-Powered
+        </span>
+        <span style='background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                    color: white; padding: 0.4rem 1rem; border-radius: 20px; 
+                    font-size: 0.9rem; font-weight: 600;'>
+            🎯 Professional
+        </span>
+        <span style='background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+                    color: white; padding: 0.4rem 1rem; border-radius: 20px; 
+                    font-size: 0.9rem; font-weight: 600;'>
+            🚀 Modern
+        </span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+def format_salary_in_inr(salary_str):
     import re
-    numbers = re.findall(r'\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)', salary_str)
-    
-    if numbers:
-        try:
-            usd_amount = float(numbers[0].replace(',', ''))
-            inr_amount = convert_usd_to_inr(usd_amount)
-            
-            if len(numbers) > 1:
-                usd_amount2 = float(numbers[1].replace(',', ''))
-                inr_amount2 = convert_usd_to_inr(usd_amount2)
-                return f"₹{inr_amount:,.0f} - ₹{inr_amount2:,.0f}"
-            else:
-                return f"₹{inr_amount:,.0f}"
-        except (ValueError, IndexError):
+    try:
+        numbers = re.findall(r'\d+', salary_str.replace(',', ''))
+        if not numbers:
             return salary_str
-    
+        if len(numbers) == 1:
+            num = int(numbers[0])
+            return f"₹{num:,.0f}"
+        elif len(numbers) >= 2:
+            num1, num2 = int(numbers[0]), int(numbers[1])
+            return f"₹{num1:,.0f} - ₹{num2:,.0f}"
+    except Exception:
+        pass
     return salary_str
 
-def main():
-    if "session_id" not in st.session_state:
-        st.session_state.session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-        atexit.register(clear_session_data)
-    
-    if "resume_content" not in st.session_state:
-        st.session_state.resume_content = None
-    if "resume_generated_data" not in st.session_state:
-        st.session_state.resume_generated_data = {}
-    if "cover_letter_content" not in st.session_state:
-        st.session_state.cover_letter_content = None
-    if "cover_letter_generated_data" not in st.session_state:
-        st.session_state.cover_letter_generated_data = {}
-    if "portfolio_content" not in st.session_state:
-        st.session_state.portfolio_content = None
-    if "portfolio_generated_data" not in st.session_state:
-        st.session_state.portfolio_generated_data = {}
-    
-    st.markdown("""
-    <script>
-    window.addEventListener('beforeunload', function (e) {
-        e.preventDefault();
-        e.returnValue = 'Are you sure you want to leave? All your generated content and profile data will be lost.';
-        return 'Are you sure you want to leave? All your generated content and profile data will be lost.';    });    </script>
-    """, unsafe_allow_html=True)
-    
-    st.title("🚀 AI Career Assistant")
-    st.markdown("Transform your career with AI-powered tools for portfolios, resumes, and interview prep!")
-    with st.spinner("Initializing AI services..."):
-        services = initialize_services()
-    
-    if services[0] is None: 
-        st.error("Failed to initialize services. Please check your configuration.")
-        return
-    
-    groq_service, data_extractor, portfolio_gen, resume_gen, cover_letter_gen, job_searcher, interview_sim = services
-    st.success("✅ Services initialized successfully!")
-    
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Choose a feature:", [
-        "📤 Data Input",
-        "💬 Chat with Resume",
-        "🌐 Portfolio Generator", 
-        "📄 Resume Generator",
-        "✉️ Cover Letter Generator",
-        "🔍 Job Search",
-        "🎤 Interview Simulator",
-            ])
-    
-    if "user_data" not in st.session_state:
-        st.session_state.user_data = {}
-    
-    if page == "📤 Data Input":
-        data_input_page(data_extractor)
-    elif page == "🌐 Portfolio Generator":
-        portfolio_page(groq_service, portfolio_gen)
-    elif page == "📄 Resume Generator":
-        resume_page(groq_service, resume_gen)
-    elif page == "✉️ Cover Letter Generator":
-        cover_letter_page(groq_service, cover_letter_gen)
-    elif page == "🔍 Job Search":
-        job_search_page(job_searcher, groq_service)
-    elif page == "🎤 Interview Simulator":
-        interview_page(interview_sim)
-    elif page == "💬 Chat with Resume":
-        resume_chat_page(groq_service)
+def initialize_services():
+    groq_service = GroqLLM(GROQ_API_KEY)
+    data_extractor = DataExtractor()
+    portfolio_gen = PortfolioGenerator()
+    resume_gen = ResumeGenerator()
+    cover_letter_gen = CoverLetterGenerator()
+    job_searcher = JobSearcher()
+    interview_sim = InterviewSimulator(groq_service)
+    return groq_service, data_extractor, portfolio_gen, resume_gen, cover_letter_gen, job_searcher, interview_sim
 
-def resume_chat_page(groq_service):
-    st.header("💬 Chat with Resume")
-    st.markdown("Ask questions about your resume, get suggestions for improvements, or practice explaining your experience.")
-    
-    if not st.session_state.get("verification_completed", False):
-        st.warning("⚠️ Please complete your profile verification in the Data Input page first.")
-        return
-    
-    if 'resume_chat_messages' not in st.session_state:
-        st.session_state.resume_chat_messages = []
-    
-    if len(st.session_state.resume_chat_messages) == 0:
-        welcome_msg = {
-            "role": "assistant",
-            "content": "Hello! I'm your AI resume assistant. I can help you with:\n\n"
-                        "• Analyzing your resume content\n"
-                        "• Suggesting improvements\n"
-                        "• Helping you explain your experience\n"
-                        "• Answering questions about your background\n\n"
-                        "What would you like to discuss about your resume?"        }
-        st.session_state.resume_chat_messages.append(welcome_msg)
-    for message in st.session_state.resume_chat_messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-    
-    if prompt := st.chat_input("Ask me anything about your resume..."):
-        st.session_state.resume_chat_messages.append({"role": "user", "content": prompt})
-        
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    user_data = st.session_state.get("user_data", {})
-                    context = f"""
-                    User Profile Information:
-                    Name: {user_data.get('name', 'Not provided')}
-                    Email: {user_data.get('email', 'Not provided')}
-                    Phone: {user_data.get('phone', 'Not provided')}
-                    LinkedIn: {user_data.get('linkedin', 'Not provided')}
-                    Title: {user_data.get('title', 'Not provided')}
-                    
-                    Skills: {', '.join(user_data.get('skills', []))}
-                    
-                    Experience: {user_data.get('experience', 'Not provided')}
-                    
-                    Education: {user_data.get('education', 'Not provided')}
-                    """
-                    chat_history = st.session_state.resume_chat_messages[:-1] if len(st.session_state.resume_chat_messages) > 1 else []
-                    
-                    response = groq_service.chat_about_resume(
-                        resume_content=context,
-                        user_message=prompt,
-                        chat_history=chat_history                    )
-                    
-                    st.markdown(response)
-                    
-                    st.session_state.resume_chat_messages.append({"role": "assistant", "content": response})
-                    
-                except Exception as e:
-                    error_msg = f"Sorry, I encountered an error: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.resume_chat_messages.append({"role": "assistant", "content": error_msg})
+services = initialize_services()
+groq_service = services[0]
+data_extractor = services[1]
+portfolio_gen = services[2]
+resume_gen = services[3]
+cover_letter_gen = services[4]
+job_searcher = services[5]
+interview_sim = services[6]
 
+if "user_data" not in st.session_state:
+    st.session_state.user_data = {}
+if "extracted_data" not in st.session_state:
+    st.session_state.extracted_data = {}
+if "verification_completed" not in st.session_state:
+    st.session_state.verification_completed = False
+if "qa_completed" not in st.session_state:
+    st.session_state.qa_completed = False
+if "resume_content" not in st.session_state:
+    st.session_state.resume_content = None
+if "generated_portfolio" not in st.session_state:
+    st.session_state.generated_portfolio = None
+if "cover_letter_content" not in st.session_state:
+    st.session_state.cover_letter_content = None
+if "search_results" not in st.session_state:
+    st.session_state.search_results = []
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
 def data_input_page(data_extractor):
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.header("📤 Data Input")
     st.markdown("Upload your resume to automatically extract and edit your profile information.")
-    
-    if "extracted_data" not in st.session_state:
-        st.session_state.extracted_data = {}
-    if "verification_completed" not in st.session_state:
-        st.session_state.verification_completed = False
     
     st.subheader("📄 Upload Your Resume")
     uploaded_file = st.file_uploader(
@@ -417,18 +995,17 @@ def data_input_page(data_extractor):
         summary_data = {
             'Name': st.session_state.user_data.get('name', 'N/A'),
             'Email': st.session_state.user_data.get('email', 'N/A'), 
-            'Phone': st.session_state.user_data.get('phone', 'N/A'),            'Title': st.session_state.user_data.get('title', 'N/A'),
+            'Phone': st.session_state.user_data.get('phone', 'N/A'),
+            'Title': st.session_state.user_data.get('title', 'N/A'),
             'Skills Count': len(st.session_state.user_data.get('skills', [])),
             'Verification': 'Resume Upload ✅'
         }
         
         col1, col2, col3 = st.columns(3)
-        
         with col1:
             st.metric("Fields Completed", len([v for v in summary_data.values() if v != 'N/A']), "out of 6")
         with col2:
             st.metric("Skills Extracted", summary_data['Skills Count'])
-        
         with col3:
             if st.button("🔄 Re-upload Resume"):
                 st.session_state.verification_completed = False
@@ -442,11 +1019,91 @@ def data_input_page(data_extractor):
             
             for i, project in enumerate(extracted_projects, 1):
                 with st.expander(f"📁 Project {i}: {project.get('title', 'Untitled Project')}", expanded=False):
-                    st.write(f"**Description:** {project.get('description', 'No description available')}")
-                    if project.get('technologies', 'Not specified') != 'Not specified':
-                        st.write(f"**Technologies:** {project.get('technologies')}")
-                    if project.get('duration', 'Not specified') != 'Not specified':
-                        st.write(f"**Duration:** {project.get('duration')}")
+                    col_info, col_actions = st.columns([3, 1])
+                    
+                    with col_info:
+                        if st.session_state.get(f'editing_project_{i}', False):
+                            with st.form(f"edit_project_form_{i}"):
+                                st.markdown("**✏️ Edit Project Details:**")
+                                new_title = st.text_input("Project Title:", value=project.get('title', ''), key=f"edit_title_{i}")
+                                new_description = st.text_area("Description:", value=project.get('description', ''), height=100, key=f"edit_desc_{i}")
+                                new_technologies = st.text_input("Technologies:", value=project.get('technologies', 'Not specified'), key=f"edit_tech_{i}")
+                                new_duration = st.text_input("Duration:", value=project.get('duration', 'Not specified'), key=f"edit_duration_{i}")
+                                
+                                col_save, col_cancel = st.columns(2)
+                                with col_save:
+                                    save_changes = st.form_submit_button("💾 Save Changes", type="primary")
+                                with col_cancel:
+                                    cancel_edit = st.form_submit_button("❌ Cancel")
+                                
+                                if save_changes:
+                                    st.session_state.user_data['projects'][i-1] = {
+                                        'title': new_title,
+                                        'description': new_description,
+                                        'technologies': new_technologies,
+                                        'duration': new_duration
+                                    }
+                                    st.session_state[f'editing_project_{i}'] = False
+                                    st.success(f"✅ Project '{new_title}' updated successfully!")
+                                    st.rerun()                                
+                                if cancel_edit:
+                                    st.session_state[f'editing_project_{i}'] = False
+                                    st.rerun()
+                        
+                        else:
+                            st.write(f"**Description:** {project.get('description', 'No description available')}")
+                            if project.get('technologies', 'Not specified') != 'Not specified':
+                                st.write(f"**Technologies:** {project.get('technologies')}")
+                            if project.get('duration', 'Not specified') != 'Not specified':
+                                st.write(f"**Duration:** {project.get('duration')}")
+                    
+                    with col_actions:
+                        if not st.session_state.get(f'editing_project_{i}', False):
+                            if st.button("✏️", key=f"edit_project_btn_{i}", help="Edit this project"):
+                                st.session_state[f'editing_project_{i}'] = True
+                                st.rerun()
+                            if st.button("🗑️", key=f"delete_project_btn_{i}", help="Delete this project"):
+                                st.session_state.user_data['projects'].pop(i-1)
+                                st.success(f"🗑️ Project deleted successfully!")
+                                st.rerun()
+            
+            st.markdown("---")
+            if st.button("➕ Add New Project", type="secondary", use_container_width=True):
+                st.session_state.adding_new_project = True
+                st.rerun()
+            
+            if st.session_state.get('adding_new_project', False):
+                with st.form("add_new_project_form"):
+                    st.markdown("**➕ Add New Project:**")
+                    new_project_title = st.text_input("Project Title:", placeholder="e.g., E-commerce Website")
+                    new_project_description = st.text_area("Description:", height=100, 
+                                                            placeholder="Describe your project, technologies used, and achievements...")
+                    new_project_technologies = st.text_input("Technologies:", placeholder="e.g., Python, React, AWS")
+                    new_project_duration = st.text_input("Duration:", placeholder="e.g., 3 months, Jan-Mar 2024")
+                    
+                    col_add, col_cancel_add = st.columns(2)
+                    with col_add:
+                        add_project = st.form_submit_button("➕ Add Project", type="primary")
+                    with col_cancel_add:
+                        cancel_add = st.form_submit_button("❌ Cancel")
+                    
+                    if add_project and new_project_title and new_project_description:
+                        new_project = {
+                            'title': new_project_title,
+                            'description': new_project_description,
+                            'technologies': new_project_technologies or 'Not specified',
+                            'duration': new_project_duration or 'Not specified'
+                        }
+                        if 'projects' not in st.session_state.user_data:
+                            st.session_state.user_data['projects'] = []
+                        st.session_state.user_data['projects'].append(new_project)
+                        st.session_state.adding_new_project = False
+                        st.success(f"✅ Project '{new_project_title}' added successfully!")
+                        st.rerun()
+                    
+                    if cancel_add:
+                        st.session_state.adding_new_project = False
+                        st.rerun()
     
     elif not uploaded_file:
         st.subheader("✏️ Manual Information Entry")
@@ -578,13 +1235,12 @@ def portfolio_page(groq_service, portfolio_gen):
             "Creative Designer", 
             "Tech Developer",
             "Business Executive",
-            "Minimalist Clean"
-        ])
+            "Minimalist Clean"        ])
         
-        include_projects = st.checkbox("Generate AI project examples", value=True, 
-                                    help="AI will create realistic project examples based on your skills")
+        include_projects = st.checkbox("Generate AI project examples", value=False, 
+                                    help="AI will create realistic project examples based on your skills (only if you don't have actual projects)")
         
-        color_scheme = st.selectbox("Color Scheme:", [            "Blue Gradient (Professional)",
+        color_scheme = st.selectbox("Color Scheme:", ["Blue Gradient (Professional)",
             "Purple Gradient (Creative)", 
             "Green Gradient (Tech)",
             "Orange Gradient (Energy)",
@@ -624,47 +1280,72 @@ def portfolio_page(groq_service, portfolio_gen):
         
         try:
             template_data = {
-                'name': st.session_state.user_data.get('name', 'Professional'),
-                'headline': portfolio_content.get('headline', portfolio_content.get('summary', 'Professional')),
-                'about': portfolio_content.get('about', 'Professional with extensive experience'),
+                'name': st.session_state.user_data.get('name'),
+                'headline': portfolio_content.get('headline', st.session_state.user_data.get('title', 'Professional')),
+                'about': portfolio_content.get('about', st.session_state.user_data.get('summary', 'Experienced professional')),
                 'skills': [],
                 'experience': [],
-                'email': st.session_state.user_data.get('email', 'contact@example.com'),
-                'phone': st.session_state.user_data.get('phone', 'Phone Number'),
-                'linkedin': st.session_state.user_data.get('linkedin', 'linkedin.com/in/professional'),
-                'portfolio_style': settings.get('portfolio_style', 'Modern Professional'),
-                'color_scheme': settings.get('color_scheme', 'Blue Gradient (Professional)')
+                'education': [],
+                'projects': [],
+                'email': st.session_state.user_data.get('email'),
+                'phone': st.session_state.user_data.get('phone'),
+                'linkedin': st.session_state.user_data.get('linkedin'),
+                'portfolio_style': settings.get('portfolio_style'),
+                'color_scheme': settings.get('color_scheme')
             }
-            
-            if 'skills_categories' in portfolio_content:
+            user_skills = st.session_state.user_data.get('skills', [])
+            if user_skills:
+                template_data['skills'] = user_skills
+            elif 'skills_categories' in portfolio_content:
                 all_skills = []
                 for category, skills in portfolio_content['skills_categories'].items():
                     if isinstance(skills, list):
                         all_skills.extend(skills)
                 template_data['skills'] = all_skills
+            elif portfolio_content.get('skills'):
+                template_data['skills'] = portfolio_content['skills']
             else:
-                template_data['skills'] = st.session_state.user_data.get('skills', [])
+                template_data['skills'] = ['Communication', 'Problem Solving', 'Leadership']
+            user_work_experience = st.session_state.user_data.get('work_experience', [])
+            user_experience = st.session_state.user_data.get('experience', '')
+            ai_experience = portfolio_content.get('experience', [])
             
-            if 'projects' in portfolio_content and portfolio_content['projects']:
-                template_data['experience'] = [
-                    {
-                        'title': project.get('name', 'Project'),
-                        'company': 'Personal/Professional Project',
-                        'duration': 'Recent',
-                        'description': project.get('description', 'Professional project')
-                    }
-                    for project in portfolio_content['projects']
-                ]
-            else:
+            if user_work_experience:
+                template_data['experience'] = user_work_experience
+            elif user_experience:
                 template_data['experience'] = [{
                     'title': st.session_state.user_data.get('title', 'Professional'),
                     'company': 'Professional Experience',
                     'duration': 'Current',
-                    'description': st.session_state.user_data.get('experience', 'Professional experience in the field')
+                    'description': user_experience
                 }]
+            elif ai_experience:
+                template_data['experience'] = ai_experience
+            else:
+                template_data['experience'] = []
+            user_education = st.session_state.user_data.get('education', '')
+            ai_education = portfolio_content.get('education', '')
+            
+            if user_education:
+                template_data['education'] = user_education
+            elif ai_education:
+                template_data['education'] = ai_education
+            else:
+                template_data['education'] = 'Educational background'
+            user_projects = st.session_state.user_data.get('projects', [])
+            ai_projects = portfolio_content.get('projects', [])
+            
+            if user_projects:
+                template_data['projects'] = user_projects
+                if settings.get('include_projects') and ai_projects:
+                    template_data['projects'].extend(ai_projects)
+            elif settings.get('include_projects') and ai_projects:
+                template_data['projects'] = ai_projects
+            else:
+                template_data['projects'] = []
             st.session_state.portfolio_template_data = template_data
             html_content = portfolio_gen.generate_html(template_data)
-            st.session_state.portfolio_html = html_content
+            st.session_state.portfolio_html = html_content;
             
             st.subheader("🌟 Portfolio Preview")
             st.components.v1.html(html_content, height=600, scrolling=True)
@@ -679,7 +1360,6 @@ def portfolio_page(groq_service, portfolio_gen):
                     use_container_width=True
                 )
             with col2:
-                # Deployment Options
                 st.markdown("### 🚀 Deploy Your Portfolio")
                 deployment_option = st.selectbox(
                     "Choose deployment platform:",
@@ -695,7 +1375,6 @@ def portfolio_page(groq_service, portfolio_gen):
                     }
                     
                     if deployment_option in deployment_urls:
-                        # Use st.link_button for better cross-platform compatibility
                         st.link_button(
                             f"🌐 Deploy to {deployment_option}",
                             deployment_urls[deployment_option],
@@ -908,7 +1587,6 @@ def resume_page(groq_service, resume_gen):
         st.info("🚀 Click 'Generate AI Resume' above to create your professional resume!")
 
 def render_detailed_job_view(job, index):
-    """Render detailed view of a job posting with enhanced AI insights"""
     col1, col2 = st.columns([2, 1])
     
     with col1:
@@ -930,12 +1608,10 @@ def render_detailed_job_view(job, index):
         if job.get('benefits'):
             st.write(f"💎 **Benefits:** {', '.join(job.get('benefits', [])[:3])}...")
         
-        # Enhanced AI Analysis Section
         if job.get('ai_analysis'):
             analysis = job.get('ai_analysis')
             st.markdown("**🤖 AI Analysis:**")
             
-            # Create tabs for different insights
             tab1, tab2, tab3 = st.tabs(["📊 Match Analysis", "💡 Market Insights", "🎯 Application Tips"])
             
             with tab1:
@@ -965,7 +1641,6 @@ def render_detailed_job_view(job, index):
                     st.info("📝 Write a compelling cover letter")
     
     with col2:
-        # Source indicator
         source = job.get('source', 'web_scraper')
         source_names = {
             'indeed': 'Indeed',
@@ -976,7 +1651,6 @@ def render_detailed_job_view(job, index):
         }
         st.info(f"🌐 **Source:** {source_names.get(source, 'Unknown')}")
         
-        # Application buttons
         platform_name = job.get('application_platform', 'LinkedIn')
         platform_icon = job.get('platform_icon', '💼')
         
@@ -986,7 +1660,6 @@ def render_detailed_job_view(job, index):
         if job.get('application_url'):
             st.link_button(f"{platform_icon} Apply on {platform_name}", job['application_url'], use_container_width=True)
         
-        # Enhanced action buttons
         col_action1, col_action2 = st.columns(2)
         
         with col_action1:
@@ -1001,7 +1674,6 @@ def render_detailed_job_view(job, index):
                 st.session_state.cover_letter_job = job
                 st.success("Job selected for cover letter!")
         
-        # AI match visualization
         try:
             match_score = int(str(job.get('ai_analysis', {}).get('match_score', job.get('ai_match_score', '0'))).replace('%', ''))
             st.progress(match_score / 100, f"AI Match: {match_score}%")
@@ -1013,1200 +1685,483 @@ def cover_letter_page(groq_service, cover_letter_gen):
     
     if not st.session_state.get("verification_completed", False):
         st.warning("⚠️ Please complete your profile verification in the Data Input page first.")
+        st.markdown('</div>', unsafe_allow_html=True)
         return
     
-    st.markdown("### 🤖 AI-Powered Personalized Cover Letters")
-    st.info("Our AI will create compelling, personalized cover letters that get interviews!")
-    
-    user_skills_experience = st.text_area(
-        "💼 Enter Your Skills and Experience:",
-        height=120,
-        placeholder="Enter your relevant skills, experience, and achievements for this position.\n\nExample:\nPython, JavaScript, React development\nTeam leadership and project management\n3 years experience in full-stack development\nLed team of 5 developers on e-commerce project",
-        help="Describe your key skills, experience, and achievements relevant to the position you're applying for.",
-        key="cover_letter_skills_experience"
-    )
-    
+    st.markdown("### 📋 Basic Information from Profile")
     col1, col2 = st.columns(2)
-    
     with col1:
-        company_name = st.text_input("🏢 Company Name:", placeholder="e.g., Google, Microsoft, Apple")
-        position = st.text_input("💼 Position Title:", placeholder="e.g., Software Engineer, Marketing Manager")
-        
+        st.text_input("Name", value=st.session_state.user_data.get('name', 'N/A'), disabled=True)
+        st.text_input("Email", value=st.session_state.user_data.get('email', 'N/A'), disabled=True)
     with col2:
-        tone = st.selectbox("Writing Tone:", [
-            "Professional & Confident",
-            "Enthusiastic & Energetic", 
-            "Formal & Conservative",
-            "Creative & Personal",
-            "Technical & Precise"
+        st.text_input("Phone", value=st.session_state.user_data.get('phone', 'N/A'), disabled=True)
+        st.text_input("Title", value=st.session_state.user_data.get('title', 'N/A'), disabled=True)
+    
+    st.markdown("### 🎯 Job & Company Information")
+    col1, col2 = st.columns(2)
+    with col1:
+        company_name = st.text_input("🏢 Company Name:", placeholder="e.g., Google, Microsoft, Tesla")
+        job_title = st.text_input("💼 Job Title:", placeholder="e.g., Software Engineer, Data Scientist")
+    with col2:
+        tone = st.selectbox("✍️ Writing Tone:", [
+            "Professional", "Enthusiastic", "Confident", "Formal", "Creative"
         ])
         
-        length = st.selectbox("Letter Length:", [
-            "Concise (200-250 words)",
-            "Standard (300-400 words)",
-            "Detailed (450-500 words)"        ])
-    
     job_description = st.text_area(
-        "📋 Job Description:", 
-        height=120,
-        placeholder="Paste the complete job description here for AI to analyze requirements and tailor your letter...",
-        key="cover_letter_job_description"
+        "📄 Job Description:",
+        height=150,
+        placeholder="Paste the complete job description here. AI will analyze requirements and tailor your cover letter accordingly...",
+        help="The more detailed the job description, the better AI can customize your cover letter"
     )
     
-    company_research = st.text_area(
-        "🔍 Company Research (Optional):",
-        height=80,
-        placeholder="Share what you know about the company, recent news, values, etc. AI will incorporate this for personalization.",
-        key="cover_letter_company_research"
-    )
+    if st.session_state.get('cover_letter_job'):
+        selected_job = st.session_state.cover_letter_job
+        st.info(f"✅ Using job: **{selected_job.get('title', 'N/A')}** at **{selected_job.get('company', 'N/A')}**")
+        if st.button("🗑️ Clear Selected Job"):
+            del st.session_state.cover_letter_job
+            st.rerun()
+        
+        if not company_name and selected_job.get('company'):
+            company_name = selected_job.get('company')
+        if not job_title and selected_job.get('title'):
+            job_title = selected_job.get('title')
+        if not job_description and selected_job.get('description'):
+            job_description = selected_job.get('description')
     
     if st.button("🚀 Generate AI Cover Letter", type="primary", use_container_width=True):
-        if not company_name or not position or not user_skills_experience:
-            st.error("⚠️ Please fill in Company Name, Position Title, and your Skills/Experience to generate a cover letter.")
+        if not all([company_name, job_title, job_description]):
+            st.error("⚠️ Please fill in Company Name, Job Title, and Job Description to generate a cover letter.")
             return
-            
+        
         with st.spinner("🤖 AI is crafting your personalized cover letter..."):
-            enhanced_data = st.session_state.user_data.copy()
-            enhanced_data.update({
-                'company_name': company_name,
-                'position': position,
-                'tone': tone,
-                'length': length,
-                'company_research': company_research,                'skills_experience_input': user_skills_experience
-            })
-            
-            skills_list = []
-            for line in user_skills_experience.split('\n'):
-                for skill in line.split(','):
-                    skill = skill.strip()
-                    if skill:
-                        skills_list.append(skill)
-            enhanced_data['skills'] = skills_list
-            
-            cover_letter = groq_service.generate_enhanced_cover_letter(
-                enhanced_data, 
-                job_description,
-                company_name,
-                position
-            )
-            
-            if cover_letter:
-                st.session_state.cover_letter_content = cover_letter
-                st.session_state.cover_letter_generated_data = {
-                    'company_name': company_name,
-                    'position': position,
-                    'user_skills_experience': user_skills_experience,
-                    'job_description': job_description,
-                    'company_research': company_research,
-                    'tone': tone,
-                    'length': length,
-                    'enhanced_data': enhanced_data
-                }
-                st.success("✅ AI Cover letter generated successfully!")
+            try:
+                cover_letter_content = groq_service.generate_enhanced_cover_letter(
+                    user_data=st.session_state.user_data,
+                    job_description=job_description,
+                    company_name=company_name,
+                    tone=tone
+                )
+                
+                if cover_letter_content:
+                    st.session_state.cover_letter_content = cover_letter_content
+                    st.session_state.cover_letter_data = {
+                        'company_name': company_name,
+                        'job_title': job_title,
+                        'job_description': job_description,
+                        'tone': tone
+                    }
+                    st.success("✅ AI Cover Letter generated successfully!")
+                else:
+                    st.error("❌ Failed to generate cover letter. Please try again.")
+            except Exception as e:
+                st.error(f"❌ Error generating cover letter: {str(e)}")
     
-    if st.session_state.cover_letter_content:
-        cover_letter = st.session_state.cover_letter_content
-        generated_data = st.session_state.cover_letter_generated_data
+    if st.session_state.get('cover_letter_content'):
+        cover_letter_content = st.session_state.cover_letter_content
+        cover_letter_data = st.session_state.get('cover_letter_data', {})
         
-        st.subheader("📝 Your Personalized Cover Letter")
-        st.markdown(cover_letter)
+        st.subheader("📝 Generated Cover Letter")
+        st.markdown(cover_letter_content)
         
-        pdf_bytes = cover_letter_gen.generate_pdf(cover_letter, generated_data['enhanced_data'], generated_data['company_name'])
-        st.download_button(
-            label="📥 Save as PDF",
-            data=pdf_bytes,
-            file_name=f"cover_letter_{generated_data['company_name'].lower().replace(' ', '_')}_{generated_data['position'].lower().replace(' ', '_')}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
+        col1, col2 = st.columns(2)
+        with col1:
+            clean_content = cover_letter_gen._clean_cover_letter_content(cover_letter_content)
+            try:
+                pdf_bytes = cover_letter_gen.generate_pdf(clean_content, st.session_state.user_data, cover_letter_data.get('company_name', 'Company'))
+                st.download_button(
+                    label="📥 Save PDF",
+                    data=pdf_bytes,
+                    file_name=f"cover_letter_{cover_letter_data.get('company_name', 'company').replace(' ', '_').lower()}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"❌ Error generating PDF: {str(e)}")
+                st.button("📥 PDF (Error)", disabled=True, use_container_width=True)
         
-        if st.button("🗑️ Clear Generated Cover Letter"):
-            st.session_state.cover_letter_content = None
-            st.session_state.cover_letter_generated_data = {}
-            st.rerun()
+        with col2:
+            if st.button("🗑️ Clear Cover Letter"):
+                if 'cover_letter_content' in st.session_state:
+                    del st.session_state.cover_letter_content
+                if 'cover_letter_data' in st.session_state:
+                    del st.session_state.cover_letter_data
+                st.rerun()
     else:
-        if not st.session_state.cover_letter_content:
-            st.info("🚀 Fill in the fields above and click 'Generate AI Cover Letter' to create your professional cover letter.")
+        st.info("🚀 Fill in the job details above and click 'Generate AI Cover Letter' to create your personalized cover letter!")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def job_search_page(job_searcher, groq_service):
-    st.header("🔍 AI Job Search")
+    st.header("🔍 AI-Powered Job Search")
     
     if not st.session_state.get("verification_completed", False):
         st.warning("⚠️ Please complete your profile verification in the Data Input page first.")
+        st.markdown('</div>', unsafe_allow_html=True)
         return
     
-    st.markdown("""
-    **🚀 Enhanced Job Search with AI Insights:**
-    - **Real-time web scraping** from Indeed, LinkedIn, and Glassdoor
-    - **AI-powered job matching** with personalized insights
-    - **Market salary analysis** and application tips
-    - **Latest job postings** updated in real-time
-    
-    **Note:** No API keys required - our enhanced scraper provides fresh job data!
-    """)
-    
-    st.markdown("### 🔍 AI-Enhanced Job Search")
-    
-    # Add real-time indicator
-    col_info1, col_info2, col_info3 = st.columns(3)
-    with col_info1:
-        st.metric("🕒 Data Freshness", "Real-time", "Live scraping")
-    with col_info2:
-        st.metric("🎯 AI Matching", "Enabled", "Smart insights")
-    with col_info3:
-        st.metric("🌐 Job Sources", "3+ Sites", "Multi-platform")
-    
-    col1, col2 = st.columns([2, 1])
+    st.markdown("### 🎯 Job Search Filters")
+    col1, col2, col3 = st.columns(3)
+    user_skills = st.session_state.user_data.get('skills', [])
+    auto_skills = ", ".join(user_skills[:5]) if user_skills else ""
     
     with col1:
-        with st.form("job_search_form"):
-            st.markdown("**🔍 Search Parameters**")
-            keywords = st.text_input("🔍 Job Keywords/Title:", placeholder="e.g., Software Engineer, Data Scientist, Product Manager")
-            location = st.text_input("📍 Location:", placeholder="e.g., New York, Remote, San Francisco, London")
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                job_type = st.selectbox("💼 Job Type:", [
-                    "Full-time Jobs",
-                    "Internships", 
-                    "Part-time Jobs",
-                    "Contract/Freelance",
-                    "Both Jobs & Internships"
-                ])
-                
-                experience_level = st.selectbox("📈 Experience Level:", [
-                    "", 
-                    "Entry Level (0-2 years)", 
-                    "Mid Level (3-5 years)", 
-                    "Senior Level (6-10 years)", 
-                    "Executive (10+ years)"
-                ])
-                
-                company_size = st.selectbox("🏢 Company Size:", [
-                    "",
-                    "Startup (1-50)",
-                    "Small (51-200)", 
-                    "Medium (201-1000)",
-                    "Large (1001-5000)",
-                    "Enterprise (5000+)"
-                ])
-            
-            with col_b:
-                salary_range = st.selectbox("💰 Expected Salary Range:", [
-                    "Not specified",
-                    "$40k - $60k",
-                    "$60k - $80k", 
-                    "$80k - $120k",
-                    "$120k - $180k",
-                    "$180k - $250k",
-                    "$250k+"
-                ])
-                
-                remote_work = st.checkbox("🏠 Include Remote Jobs", value=True)
-                posted_within = st.selectbox("📅 Posted Within:", [
-                    "Any time",
-                    "Last 24 hours",
-                    "Last 3 days",
-                    "Last week",
-                    "Last month"
-                ])
-            
-            # Add advanced search options
-            with st.expander("🔧 Advanced Search Options"):
-                col_adv1, col_adv2 = st.columns(2)
-                with col_adv1:
-                    industry_filter = st.selectbox("🏭 Industry:", [
-                        "Any",
-                        "Technology",
-                        "Finance",
-                        "Healthcare", 
-                        "Education",
-                        "Manufacturing",
-                        "Retail",
-                        "Consulting",
-                        "Non-profit"
-                    ])
-                with col_adv2:
-                    job_sources = st.multiselect("🌐 Job Sources:", [
-                        "Indeed",
-                        "LinkedIn", 
-                        "Glassdoor",
-                        "Company Websites"                    ], default=["Indeed", "LinkedIn", "Glassdoor"])
-            
-            submitted = st.form_submit_button("🚀 Search Latest Jobs", type="primary", use_container_width=True)
-            st.caption("⚡ Real-time search across multiple job platforms with AI insights")
+        keywords = st.text_input("🔍 Keywords/Skills:", value=auto_skills, placeholder="e.g. Python, Data Science, React")
+        location = st.text_input("📍 Location:", placeholder="e.g. New York, Remote")
     
     with col2:
-        if st.session_state.get("user_data"):
-            st.markdown("**👤 Profile Summary:**")
-            user_data = st.session_state.user_data
-            st.write(f"**Name:** {user_data.get('name', 'N/A')}")
-            st.write(f"**Title:** {user_data.get('title', 'N/A')}")
-            st.write(f"**Skills:** {len(user_data.get('skills', []))}")
-            st.write(f"**Experience:** {user_data.get('experience_level', 'N/A')}")
-        else:
-            st.info("👆 Complete your profile above to get personalized job recommendations.")
-
-    if submitted and keywords:
-        with st.spinner("🔍 Searching latest jobs across multiple platforms..."):
-            jobs = job_searcher.search_jobs(
-                keywords=keywords, 
-                location=location, 
-                experience_level=experience_level,
-                company_size=company_size,
-                remote=remote_work,
-                job_type=job_type,
-                limit=25
-            )
-            
-            if st.session_state.get("user_data") and jobs:
-                with st.spinner("🧠 Analyzing job matches with AI..."):
-                    enhanced_jobs = groq_service.analyze_job_matches(jobs, st.session_state.user_data)
-                    jobs = enhanced_jobs
-            
-        if jobs:
-            st.success(f"🎉 Found {len(jobs)} latest job opportunities from multiple sources!")
-              # Enhanced filtering and sorting
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                sort_by = st.selectbox("📊 Sort by:", ["AI Match Score", "Date Posted", "Company", "Salary"])
-            with col2:
-                company_filter = st.multiselect("🏢 Filter by Company:", 
-                                                options=list(set([job.get('company', '') for job in jobs])))
-            with col3:
-                show_only_remote = st.checkbox("🏠 Remote only")
-                show_high_match = st.checkbox("🎯 High match (80%+)")
-            with col4:
-                view_mode = st.radio("📱 View:", ["Detailed", "Compact"])
-            
-            filtered_jobs = jobs
-            if company_filter:
-                filtered_jobs = [job for job in jobs if job.get('company') in company_filter]
-            if show_only_remote:
-                filtered_jobs = [job for job in jobs if job.get('remote_type')]
-            if show_high_match:
-                filtered_jobs = [job for job in jobs if 
-                               int(str(job.get('ai_analysis', {}).get('match_score', 
-                                      job.get('ai_match_score', '0'))).replace('%', '')) >= 80]
-              # Sort jobs
-            if sort_by == "AI Match Score":
-                filtered_jobs = sorted(filtered_jobs, key=lambda x: 
-                                     int(str(x.get('ai_analysis', {}).get('match_score', 
-                                            x.get('ai_match_score', '0'))).replace('%', '')), reverse=True)
-            elif sort_by == "Date Posted":
-                filtered_jobs = sorted(filtered_jobs, key=lambda x: x.get('posted_date', ''), reverse=True)
-            
-            st.info(f"📋 Showing {len(filtered_jobs)} jobs (filtered from {len(jobs)} total)")
-            
-            for i, job in enumerate(filtered_jobs):
-                match_score = job.get('ai_analysis', {}).get('match_score', job.get('ai_match_score', 'N/A'))
-                source = job.get('source', 'web_scraper')
-                source_icons = {
-                    'indeed': '🔵',
-                    'linkedin': '🔗', 
-                    'glassdoor': '🟢',
-                    'google_jobs_api': '🔍',
-                    'web_scraper': '🤖'
-                }
-                source_icon = source_icons.get(source, '🤖')
-                
-                # Enhanced match score display with color coding
+        experience_level = st.selectbox("📈 Experience Level:", [
+            "", "Entry Level", "Mid Level", "Senior Level", "Executive"
+        ])
+        job_type = st.selectbox("💼 Job Type:", [
+            "Full-time", "Part-time", "Contract", "Internship", "Remote"
+        ])
+    
+    with col3:
+        limit = st.slider("📊 Results Limit:", 5, 50, 20)
+        sort_by = st.selectbox("🔄 Sort By:", [
+            "Relevance", "Date Posted", "Salary (High to Low)", "Company Rating"
+        ])
+    
+    col_search1, col_search2, col_search3 = st.columns(3)
+    
+    with col_search1:
+        if st.button("🔍 Search Jobs", type="primary", use_container_width=True):
+            if not keywords.strip():
+                st.error("⚠️ Please enter keywords or skills to search for jobs.")
+            else:
+                with st.spinner("🤖 AI is searching for relevant jobs..."):
+                    try:
+                        jobs = job_searcher.search_jobs(
+                            keywords=keywords,
+                            location=location,
+                            experience_level=experience_level,
+                            job_type=job_type,
+                            limit=limit
+                        )
+                        st.session_state.search_results = jobs
+                        st.session_state.search_params = {
+                            'keywords': keywords,
+                            'location': location,
+                            'experience_level': experience_level,
+                            'job_type': job_type
+                        }
+                        st.success(f"✅ Found {len(jobs)} job opportunities!")
+                    except Exception as e:
+                        st.error(f"❌ Search failed: {str(e)}")
+    
+    with col_search2:
+        if st.button("🔥 Trending Jobs", use_container_width=True):
+            with st.spinner("🤖 Finding trending opportunities..."):
                 try:
-                    score_num = int(str(match_score).replace('%', ''))
-                    if score_num >= 90:
-                        match_color = "🟢"
-                    elif score_num >= 75:
-                        match_color = "🟡"
-                    elif score_num >= 60:
-                        match_color = "🟠"
-                    else:
-                        match_color = "🔴"
-                except:
-                    match_color = "⚪"
-                    score_num = 0
-                
-                job_title = f"{source_icon} {job.get('title', 'Job Title')} at {job.get('company', 'Company')}"
-                match_info = f"{match_color} AI Match: {match_score}%"
-                
-                if view_mode == "Compact":
-                    # Compact view
-                    with st.container():
-                        col_compact1, col_compact2, col_compact3 = st.columns([3, 1, 1])
-                        with col_compact1:
-                            st.markdown(f"**{job_title}**")
-                            st.caption(f"📍 {job.get('location', 'N/A')} | 💰 {format_salary_in_inr(job.get('salary_range', 'Not specified'))}")
-                        with col_compact2:
-                            st.markdown(f"**{match_info}**")
-                        with col_compact3:
-                            if st.button("👀 View Details", key=f"view_{i}", use_container_width=True):
-                                st.session_state[f'expanded_job_{i}'] = not st.session_state.get(f'expanded_job_{i}', False)
-                        
-                        if st.session_state.get(f'expanded_job_{i}', False):
-                            render_detailed_job_view(job, i)
-                else:
-                    # Detailed view
-                    with st.expander(f"{job_title} - {match_info}", expanded=False):
-                        render_detailed_job_view(job, i)
+                    trending_jobs = job_searcher.get_trending_jobs(location or "Remote")
+                    st.session_state.search_results = trending_jobs
+                    st.session_state.search_params = {'type': 'trending', 'location': location}
+                    st.success(f"✅ Found {len(trending_jobs)} trending opportunities!")
+                except Exception as e:
+                    st.error(f"❌ Failed to get trending jobs: {str(e)}")
+    
+    with col_search3:
+        if st.button("🎯 AI Recommendations", use_container_width=True):
+            with st.spinner("🤖 Getting personalized recommendations..."):
+                try:
+                    user_skills = st.session_state.user_data.get('skills', [])
+                    recommended_jobs = job_searcher.get_job_recommendations(user_skills, location or "Remote")
+                    st.session_state.search_results = recommended_jobs
+                    st.session_state.search_params = {'type': 'recommendations', 'skills': user_skills}
+                    st.success(f"✅ Found {len(recommended_jobs)} personalized recommendations!")
+                except Exception as e:
+                    st.error(f"❌ Failed to get recommendations: {str(e)}")
+    
+    if st.session_state.get('search_results'):
+        jobs = st.session_state.search_results
+        search_params = st.session_state.get('search_params', {})
+        
+        st.markdown("---")
+        st.subheader(f"📋 Search Results ({len(jobs)} jobs found)")
+        
+        if search_params.get('type') == 'trending':
+            st.info(f"🔥 Showing trending jobs for **{search_params.get('location', 'All locations')}**")
+        elif search_params.get('type') == 'recommendations':
+            skills_text = ", ".join(search_params.get('skills', [])[:3])
+            st.info(f"🎯 Personalized recommendations based on your skills: **{skills_text}**")
         else:
-            st.info("🔍 No jobs found. Try different keywords or broader search terms.")
+            st.info(f"🔍 Results for **{search_params.get('keywords', 'N/A')}** in **{search_params.get('location', 'All locations')}**")
+        
+        jobs_per_page = 5
+        total_pages = (len(jobs) - 1) // jobs_per_page + 1
+        
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 1
+        
+        if total_pages > 1:
+            col_prev, col_info, col_next = st.columns([1, 2, 1])
+            with col_prev:
+                if st.button("⬅️ Previous", disabled=st.session_state.current_page == 1):
+                    st.session_state.current_page -= 1
+                    st.rerun()
+            with col_info:
+                st.write(f"Page {st.session_state.current_page} of {total_pages}")
+            with col_next:
+                if st.button("➡️ Next", disabled=st.session_state.current_page == total_pages):
+                    st.session_state.current_page += 1
+                    st.rerun()
+        
+        start_idx = (st.session_state.current_page - 1) * jobs_per_page
+        end_idx = start_idx + jobs_per_page
+        current_jobs = jobs[start_idx:end_idx]
+        
+        for i, job in enumerate(current_jobs):
+            with st.container():
+                col_title, col_company, col_match = st.columns([3, 2, 1])
+                
+                with col_title:
+                    st.markdown(f"### 💼 {job.get('title', 'Job Title')}")
+                    if job.get('location'):
+                        st.write(f"📍 {job.get('location')}")
+                
+                with col_company:
+                    st.markdown(f"**🏢 {job.get('company', 'Company')}**")
+                    if job.get('posted_date'):
+                        st.write(f"📅 {job.get('posted_date')}")
+                
+                with col_match:
+                    try:
+                        match_score = job.get('ai_match_score', job.get('match_score', 75))
+                        if isinstance(match_score, str):
+                            match_score = int(match_score.replace('%', ''))
+                        st.metric("🎯 AI Match", f"{match_score}%")
+                    except:
+                        st.metric("🎯 AI Match", "Good")
+                
+                col_details, col_actions = st.columns([2, 1])
+                
+                with col_details:
+                    salary_display = format_salary_in_inr(job.get('salary_range', job.get('salary', 'Competitive')))
+                    st.write(f"💰 **Salary:** {salary_display}")
+                    
+                    emp_type = job.get('employment_type', 'Full-time')
+                    remote_info = " (Remote)" if job.get('remote_type') else ""
+                    st.write(f"⏰ **Type:** {emp_type}{remote_info}")
+                    
+                    if job.get('skills'):
+                        skills_text = ", ".join(job.get('skills', [])[:5])
+                        st.write(f"🛠️ **Skills:** {skills_text}")
+                    
+                    description = job.get('description', '')
+                    if description:
+                        preview = description[:200] + "..." if len(description) > 200 else description
+                        st.write(f"📝 {preview}")
+                
+                with col_actions:
+                    if job.get('application_url'):
+                        st.link_button(
+                            "🚀 Apply Now",
+                            job['application_url'],
+                            use_container_width=True
+                        )
+                    elif job.get('linkedin_url'):
+                        st.link_button(
+                            "💼 View on LinkedIn",
+                            job['linkedin_url'],
+                            use_container_width=True
+                        )
+                with st.expander(f"📊 View Full Details"):
+                    render_detailed_job_view(job, start_idx + i)
+                
+                st.divider()
+        
+        if st.button("🔄 Reset Search"):
+            if 'search_results' in st.session_state:
+                del st.session_state.search_results
+            if 'search_params' in st.session_state:
+                del st.session_state.search_params
+            if 'current_page' in st.session_state:
+                del st.session_state.current_page
+            st.rerun()
     
     if st.session_state.get('saved_jobs'):
-        st.markdown("### 💾 Your Saved Jobs")
-        for i, job in enumerate(st.session_state.saved_jobs):
-            with st.expander(f"{job.get('title')} at {job.get('company')}"):
-                st.write(f"📍 **Location:** {job.get('location')}")
-                saved_salary_display = format_salary_in_inr(job.get('salary_range', 'Not specified'))
-                st.write(f"💰 **Salary:** {saved_salary_display}")
-                st.write(f"📅 **Saved on:** {job.get('saved_date', 'Recently')}")
-                
-                if st.button(f"Remove", key=f"remove_{i}"):
-                    st.session_state.saved_jobs.pop(i)
-                    st.rerun()
+        st.markdown("---")
+        st.subheader(f"💾 Saved Jobs ({len(st.session_state.saved_jobs)})")
+        
+        with st.expander("View Saved Jobs"):
+            for i, saved_job in enumerate(st.session_state.saved_jobs):
+                col_job, col_remove = st.columns([4, 1])
+                with col_job:
+                    st.write(f"💼 **{saved_job.get('title')}** at **{saved_job.get('company')}**")
+                    st.write(f"📍 {saved_job.get('location', 'N/A')}")
+                with col_remove:
+                    if st.button("🗑️", key=f"remove_saved_{i}", help="Remove saved job"):
+                        st.session_state.saved_jobs.pop(i)
+                        st.rerun()
+    
+    else:
+        st.info("🔍 Use the search filters above to find relevant job opportunities!")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def interview_page(interview_sim):
     st.header("🎤 AI Interview Simulator")
     
     if not st.session_state.get("verification_completed", False):
         st.warning("⚠️ Please complete your profile verification in the Data Input page first.")
+        st.markdown('</div>', unsafe_allow_html=True)
         return
     
-    st.markdown("### 🤖 Chat-Based Interview Practice")
-    st.info("Practice with our AI interviewer in a conversational format. Answer 5 questions and get detailed analysis!")
+    if not hasattr(st.session_state, 'interview_ui'):
+        st.session_state.interview_ui = InterviewUI(interview_sim)
     
-    if 'chat_interview_active' not in st.session_state:
-        st.session_state.chat_interview_active = False
-    if 'chat_messages' not in st.session_state:
-        st.session_state.chat_messages = []
-    if 'interview_question_count' not in st.session_state:
-        st.session_state.interview_question_count = 0
-    if 'interview_job_info' not in st.session_state:
-        st.session_state.interview_job_info = {}
-    if 'interview_complete' not in st.session_state:
-        st.session_state.interview_complete = False
+    interview_ui = st.session_state.interview_ui
     
-    if not st.session_state.chat_interview_active and not st.session_state.interview_complete:
-        render_chat_interview_setup(interview_sim)
-    elif st.session_state.chat_interview_active and not st.session_state.interview_complete:
-        render_chat_interview(interview_sim)
-    elif st.session_state.interview_complete:
-        render_chat_interview_results(interview_sim)
+    if not st.session_state.get('interview_active', False):
+        interview_ui.render_interview_setup()
+    
+    elif st.session_state.get('interview_active') and not st.session_state.get('interview_completed', False):
+        interview_ui.render_active_interview()
+    
+    elif st.session_state.get('interview_completed', False):
+        interview_ui.render_interview_results()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-def render_interview_setup(interview_sim):
-    st.subheader("🎯 Interview Setup")
-    st.markdown("Configure your AI interview session:")
+def resume_chat_page(groq_service):
+    st.header("💬 Chat with Resume AI")
     
-    col1, col2 = st.columns(2)
+    if not st.session_state.get("verification_completed", False):
+        st.warning("⚠️ Please complete your profile verification in the Data Input page first.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
     
-    with col1:
-        job_title = st.text_input("🎯 Job Title", 
-                                placeholder="e.g., Software Engineer, Data Scientist", 
-                                help="The position you're interviewing for")
-        company = st.text_input("🏢 Company Name", 
-                                placeholder="e.g., Google, Microsoft, Amazon",
-                                help="Target company (optional)")
-        
-    with col2:
-        experience_level = st.selectbox("📊 Experience Level", [
-            "Entry Level (0-2 years)",
-            "Mid Level (3-5 years)", 
-            "Senior Level (6-10 years)",
-            "Executive (10+ years)"
-        ])
-        
-        interview_type = st.selectbox("🎭 Interview Type", [
-            "General/Behavioral",
-            "Technical/Skills-based",        "Case Study/Problem Solving",
-            "Leadership/Management",
-            "Mixed (All types)"
-        ])
+    st.markdown("### 🤖 Your Personal Resume Assistant")
+    st.info("Ask me anything about your resume, career advice, job market trends, or get personalized recommendations!")
     
-    job_description = st.text_area(
-        "📋 Job Description (Optional but Recommended)",
-        height=120,
-        placeholder="Paste the job description here for more targeted interview questions...",
-        help="AI will generate questions specifically tailored to this role",
-        key="interview_job_description"
-    )
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
     
-    st.subheader("⚙️ Interview Settings")
-    col1, col2, col3 = st.columns(3)
+    if 'resume_context' not in st.session_state:
+        user_data = st.session_state.user_data
+        context = f"""
+        User Profile:
+        Name: {user_data.get('name', 'N/A')}
+        Title: {user_data.get('title', 'N/A')}
+        Skills: {', '.join(user_data.get('skills', []))}
+        Experience: {user_data.get('experience', 'N/A')}
+        Education: {user_data.get('education', 'N/A')}
+        
+        Resume Projects: {len(user_data.get('projects', []))} projects available
+        """
+        st.session_state.resume_context = context
     
-    with col1:
-        num_questions = st.selectbox("Number of Questions", [3, 5, 8, 10], index=1)
-    with col2:
-        difficulty = st.selectbox("Difficulty Level", ["Easy", "Medium", "Hard", "Mixed"])
-    with col3:
-        time_limit = st.selectbox("Time per Question", ["No Limit", "2 minutes", "3 minutes", "5 minutes"])
-    
-    with st.expander("📖 What to Expect in This Interview"):
-        st.markdown(f"""
-        **Interview Type:** {interview_type}
-        **Number of Questions:** {num_questions}
-        **Difficulty:** {difficulty}
-        **Time per Question:** {time_limit}
-        
-        **You'll receive:**
-        - Real-time AI feedback on each answer
-        - Scoring based on relevance, clarity, and depth
-        - Suggestions for improvement
-        - Final performance report with detailed analysis
-        
-        **Tips for Success:**
-        - Speak clearly and provide specific examples
-        - Use the STAR method (Situation, Task, Action, Result)
-        - Take your time to think before answering
-        - Be authentic and honest in your responses
-        """)
-    
-    if st.button("🚀 Start AI Interview", type="primary", use_container_width=True):
-        if not job_title:
-            st.error("⚠️ Please provide a job title to start the interview.")
-            return
-        
-        if not job_description:
-            job_description = f"""
-            {interview_type} interview for {job_title} position at {company if company else 'a leading company'}.
-            Experience level: {experience_level}
-            
-            Key areas to assess:
-            - Relevant technical and soft skills
-            - Problem-solving abilities
-            - Communication and teamwork
-            - Cultural fit and motivation
-            - Experience and achievements
-            """
-        
-        user_background = st.session_state.get('user_data', {})
-        user_background.update({
-            'target_job_title': job_title,
-            'target_company': company,
-            'experience_level': experience_level,
-            'interview_type': interview_type,
-            'difficulty': difficulty,
-            'num_questions': num_questions
-        })
-        
-        with st.spinner("🤖 AI is preparing your personalized interview questions..."):
-            session = interview_sim.start_interview_session(job_description, user_background)
-            
-            if session and session.get('questions'):
-                st.session_state.interview_session = session
-                st.session_state.interview_active = True
-                st.session_state.interview_messages = []
-                st.success("✅ Interview session created! Starting now...")
-                st.rerun()
+    chat_container = st.container()
+    with chat_container:
+        for i, message in enumerate(st.session_state.chat_history):
+            if message['role'] == 'user':
+                with st.chat_message("user"):
+                    st.write(message['content'])
             else:
-                st.error("❌ Failed to create interview session. Please try again.")
-
-def render_active_interview(interview_sim):
-    session = st.session_state.interview_session
-    current_q_index = session['current_question']
-    total_questions = len(session['questions'])
-    current_q = interview_sim.get_current_question(session)
+                with st.chat_message("assistant"):
+                    st.write(message['content'])
     
-    if not current_q:
-        render_interview_results(interview_sim)
-        return
-    
-    progress = current_q_index / total_questions
-    st.progress(progress, text=f"Question {current_q_index + 1} of {total_questions}")
-    
-    st.subheader(f"Question {current_q_index + 1}")
-    
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        st.write(f"**Type:** {current_q.get('type', 'General')}")
-    with col2:
-        st.write(f"**Difficulty:** {current_q.get('difficulty', 'Medium')}")
-    with col3:
-        st.write(f"**Focus:** {current_q.get('category', 'General Skills')}")
-    
-    st.markdown(f"### 💬 {current_q['question']}")
-    
-    if current_q.get('context'):
-        st.info(f"💡 **Context:** {current_q['context']}")
-    
-    st.markdown("### ✍️ Your Answer")
-    answer = st.text_area(
-        "Type your response here:",
-        height=200,
-        placeholder="Take your time to provide a thoughtful, detailed answer. Use specific examples when possible...",
-        key=f"answer_{current_q_index}",
-        help="Tip: Use the STAR method (Situation, Task, Action, Result) for behavioral questions"
-    )
-    
-    if answer:
-        char_count = len(answer)
-        if char_count < 50:
-            st.warning(f"📝 {char_count} characters - Consider providing more detail")
-        elif char_count < 200:
-            st.info(f"📝 {char_count} characters - Good length, add more specifics if possible")
-        else:
-            st.success(f"📝 {char_count} characters - Great detailed response!")
-    
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-    
-    with col1:
-        submit_disabled = not answer.strip() or len(answer.strip()) < 10
-        if st.button("✅ Submit Answer", type="primary", disabled=submit_disabled, use_container_width=True):
-            with st.spinner("🤖 AI is evaluating your answer..."):
-                evaluation = interview_sim.submit_answer(session, answer)
-                if evaluation:
-                    st.session_state.last_evaluation = evaluation
-                    st.rerun()
-    
-    with col2:
-        if st.button("⏭️ Skip", use_container_width=True):
-            interview_sim.submit_answer(session, "Question skipped by candidate")
-            st.rerun()
-    
-    with col3:
-        if st.button("🔄 Regenerate Q", use_container_width=True, help="Get a different question"):
-            user_data = st.session_state.get('user_data', {})
-            job_desc = session.get('job_description', '')
-            groq_service = initialize_services()[0]
-            if groq_service:
-                new_question = groq_service.generate_interview_question(user_data, job_desc)
-                if new_question:
-                    session['questions'][current_q_index] = {
-                        'question': new_question,
-                        'type': current_q.get('type', 'General'),
-                        'difficulty': current_q.get('difficulty', 'Medium'),
-                        'category': current_q.get('category', 'General')
-                    }
-                    st.rerun()
-    
-    with col4:
-        if st.button("🛑 End Interview", use_container_width=True):
-            st.session_state.interview_active = False
-            st.rerun()
-    
-    if hasattr(st.session_state, 'last_evaluation') and st.session_state.last_evaluation:
-        render_question_feedback(st.session_state.last_evaluation)
-
-def render_question_feedback(evaluation):
-    st.divider()
-    st.subheader("📊 Feedback on Previous Answer")
-    
-    score = evaluation.get('score', 5)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"**Score:** {score}/10")
-    
-    with col2:
-        if evaluation.get('strengths'):
-            st.markdown("**✅ What You Did Well:**")
-            for strength in evaluation['strengths']:
-                st.write(f"• {strength}")
-    
-    if score >= 8:
-        st.success("🎉 Excellent Response!")
-    elif score >= 6:
-        st.info("👍 Good Answer")
-    elif score >= 4:
-        st.warning("⚠️ Fair Response")
-    else:
-        st.error("❌ Needs Improvement")
-    
-    if evaluation.get('feedback'):
-        st.markdown("**💭 AI Interviewer Feedback:**")
-        st.info(evaluation['feedback'])
-    
-    if evaluation.get('suggestions'):
-        st.markdown("**💡 Suggestions for Next Time:**")
-        st.write(evaluation['suggestions'])
-
-def render_interview_results(interview_sim):
-    session = st.session_state.interview_session
-    report = interview_sim.get_final_report(session)
-    
-    st.balloons()
-    st.subheader("🎉 Interview Complete!")
-    
-    score = report['overall_score']
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        if score >= 8:
-            st.success(f"🌟 Overall Score: {score}/10")
-            st.success(f"Performance: {report['performance_level']}")
-        elif score >= 6:
-            st.info(f"👍 Overall Score: {score}/10")
-            st.info(f"Performance: {report['performance_level']}")
-        elif score >= 4:
-            st.warning(f"⚠️ Overall Score: {score}/10")
-            st.warning(f"Performance: {report['performance_level']}")
-        else:
-            st.error(f"❌ Overall Score: {score}/10")
-            st.error(f"Performance: {report['performance_level']}")
-    
-    st.markdown(f"### 💬 {report['message']}")
-    
+    st.markdown("### 🚀 Quick Actions")
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Questions Answered", report['questions_answered'])
+        if st.button("📄 Analyze My Resume", use_container_width=True):
+            question = "Please analyze my resume and provide feedback on strengths and areas for improvement."
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            with st.spinner("🤖 Analyzing your resume..."):
+                response = groq_service.chat_with_resume(question, st.session_state.resume_context)
+                st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
     with col2:
-        st.metric("Duration", f"{report['duration_minutes']} min")
+        if st.button("💡 Career Advice", use_container_width=True):
+            question = "Based on my background, what career advice and next steps would you recommend?"
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            with st.spinner("🤖 Generating career advice..."):
+                response = groq_service.chat_with_resume(question, st.session_state.resume_context)
+                st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
     with col3:
-        st.metric("Average Score", f"{score}/10")
+        if st.button("🎯 Job Matching", use_container_width=True):
+            question = "What types of jobs and roles would be the best fit for my skills and experience?"
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            with st.spinner("🤖 Finding job matches..."):
+                response = groq_service.chat_with_resume(question, st.session_state.resume_context)
+                st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+    
     with col4:
-        completion_rate = (report['questions_answered'] / len(session['questions'])) * 100
-        st.metric("Completion Rate", f"{completion_rate:.0f}%")
-    
-    if st.checkbox("📊 Show Detailed Question Breakdown", value=True):
-        detailed_feedback = report.get('detailed_feedback', [])
-        if detailed_feedback:
-            for i, feedback in enumerate(detailed_feedback):
-                if i < len(session['answers']): 
-                    with st.expander(f"Question {i + 1} - Score: {feedback.get('score', 'N/A')}/10"):
-                        question = session['questions'][i]['question']
-                        answer = session['answers'][i]
-                        st.markdown(f"**❓ Question:** {question}")
-                        st.markdown(f"**💬 Your Answer:** {answer}")
-                        
-                        if feedback.get('feedback'):
-                            st.markdown(f"**🤖 AI Feedback:** {feedback['feedback']}")
-        else:
-            st.info("📝 Detailed feedback is not available for this session.")
-        
-        if feedback.get('strengths'):
-            st.markdown("**✅ Strengths:**")
-            for strength in feedback['strengths']:
-                st.write(f"• {strength}")
-        
-        if feedback.get('weaknesses'):
-            st.markdown("**📈 Improvement Areas:**")
-            for weakness in feedback['weaknesses']:
-                st.write(f"• {weakness}")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("🔄 Practice Again", type="primary", use_container_width=True, key="practice_again_traditional"):
-                for key in ['interview_session', 'interview_active', 'last_evaluation']:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                st.rerun()
-        
-        with col2:
-            if st.button("📊 Download Report", use_container_width=True, key="download_report_traditional"):
-                report_text = generate_report_text(report, session)
-                st.download_button(
-                    label="📄 Download Detailed Report",
-                    data=report_text,
-                    file_name=f"interview_report_{int(time.time())}.txt",
-                    mime="text/plain"
-                )
-        
-        with col3:
-            if st.button("🎯 Practice Specific Areas", use_container_width=True, key="practice_specific_traditional"):
-                st.info("💡 Navigate back to the setup to practice specific interview types or difficulties!")
-
-def generate_report_text(report, session):
-    import time
-    
-    lines = [
-        "AI INTERVIEW PERFORMANCE REPORT",
-        "=" * 50,
-        f"Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-        "",
-        "OVERALL PERFORMANCE:",
-        f"• Overall Score: {report['overall_score']}/10",
-        f"• Performance Level: {report['performance_level']}", 
-        f"• Questions Answered: {report['questions_answered']}",
-        f"• Interview Duration: {report['duration_minutes']} minutes",
-        "",
-        "EXECUTIVE SUMMARY:",
-        report['message'],
-        "",
-        "DETAILED QUESTION BREAKDOWN:",
-        "-" * 40
-    ]
-    
-    for i, feedback in enumerate(report['detailed_feedback']):
-        if i < len(session['answers']):
-            lines.extend([
-                f"",
-                f"QUESTION {i + 1}:",
-                f"Q: {session['questions'][i]['question']}",
-                f"A: {session['answers'][i]}",
-                f"Score: {feedback.get('score', 'N/A')}/10",
-                f"Feedback: {feedback.get('feedback', 'No feedback available')}",
-                "-" * 40
-            ])
-    
-    if report.get('improvement_areas'):
-        lines.extend([
-            "",
-            "KEY IMPROVEMENT AREAS:",
-            *[f"• {area}" for area in report['improvement_areas']]
-        ])
-    
-    if report.get('strengths'):
-        lines.extend([
-            "",
-            "DEMONSTRATED STRENGTHS:",
-            *[f"• {strength}" for strength in report['strengths']]
-        ])
-    
-    lines.extend([
-        "",
-        "RECOMMENDATIONS:",
-        "• Continue practicing with different interview types",
-        "• Focus on providing specific examples using the STAR method",
-        "• Practice articulating achievements with quantifiable results",
-        "• Research target companies and roles thoroughly",
-        "",
-        "Good luck with your interviews!"
-    ])
-    
-    return "\n".join(lines)
-
-def render_chat_interview_setup(interview_sim):
-    st.subheader("💬 Chat Interview Setup")
-    st.markdown("Configure your conversational AI interview session:")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        job_title = st.text_input("🎯 Job Title", 
-                                placeholder="e.g., Software Engineer, Data Scientist", 
-                                help="The position you're interviewing for",
-                                key="chat_job_title")
-        company = st.text_input("🏢 Company Name", 
-                                placeholder="e.g., Google, Microsoft, Amazon",
-                                help="Target company (optional)",
-                                key="chat_company")
-        
-    with col2:
-        experience_level = st.selectbox("📊 Experience Level", [
-            "Entry Level (0-2 years)",
-            "Mid Level (3-5 years)", 
-            "Senior Level (6-10 years)",
-            "Executive (10+ years)"
-        ], key="chat_experience")
-        
-        interview_type = st.selectbox("🎭 Interview Type", [
-            "General/Behavioral",
-            "Technical",
-            "System Design",
-            "Case Study"
-        ], key="chat_interview_type")
-    
-    job_description = st.text_area("📝 Job Description (Optional)", 
-                                    placeholder="Paste the job description here for more targeted questions...",
-                                    height=100,
-                                    key="chat_job_desc")
-    
-    st.markdown("---")
-    st.subheader("🎯 Interview Settings")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        num_questions = st.slider("Number of Questions", 3, 10, 5, key="chat_num_questions")
-    with col2:
-        difficulty = st.selectbox("Difficulty Level", 
-                                ["Easy", "Medium", "Hard", "Mixed"], 
-                                index=2, key="chat_difficulty")
-    
-    if st.button("🚀 Start Chat Interview", type="primary", use_container_width=True):
-        if job_title:
-            st.session_state.interview_job_info = {
-                'job_title': job_title,
-                'company': company,
-                'experience_level': experience_level,
-                'interview_type': interview_type,
-                'job_description': job_description or f"{job_title} position at {company}. {experience_level} role.",
-                'num_questions': num_questions,
-                'difficulty': difficulty
-            }
-            
-            st.session_state.chat_interview_messages = []
-            st.session_state.chat_interview_active = True
-            st.session_state.current_question_num = 0
-            st.session_state.interview_answers = []
-            st.session_state.interview_scores = []          
-            user_background = st.session_state.get('user_data', {})
-            try:
-                questions = interview_sim.groq_service.generate_interview_questions(
-                    st.session_state.interview_job_info['job_description'], 
-                    user_background,
-                    num_questions=num_questions
-                )
-                if not questions or len(questions) == 0:
-                    st.error("❌ Failed to generate interview questions. Please try again.")
-                    return
-                
-                st.session_state.interview_questions = questions
-                first_question = questions[0]
-            except Exception as e:
-                st.error(f"❌ Error generating interview questions: {str(e)}")
-                return
-            
-            welcome_msg = f"Welcome to your {interview_type} interview for {job_title}"
-            if company:
-                welcome_msg += f" at {company}"
-            welcome_msg += "! I'm your AI interviewer. Let's begin with your first question:"
-            
-            st.session_state.chat_interview_messages = [
-                {"role": "assistant", "content": welcome_msg},
-                {"role": "assistant", "content": first_question['question']}
-            ]
-            st.session_state.current_question = first_question
-            
+        if st.button("📈 Skill Gaps", use_container_width=True):
+            question = "What skills should I learn or improve to advance in my career and become more competitive?"
+            st.session_state.chat_history.append({"role": "user", "content": question})
+            with st.spinner("🤖 Analyzing skill gaps..."):
+                response = groq_service.chat_with_resume(question, st.session_state.resume_context)
+                st.session_state.chat_history.append({"role": "assistant", "content": response})
             st.rerun()
-        else:
-            st.error("Please provide at least a job title to start the interview.")
-
-def render_chat_interview(interview_sim):
-    st.subheader("💬 Live Interview Chat")
     
-    job_info = st.session_state.interview_job_info
-    progress = st.session_state.current_question_num / job_info['num_questions']
-    st.progress(progress, text=f"Question {st.session_state.current_question_num + 1} of {job_info['num_questions']}")
+    st.markdown("### 💬 Ask Me Anything")
+    user_question = st.text_area(
+        "Type your question about your resume, career, or job search:",
+        placeholder="Example questions:\n- How can I improve my resume?\n- What salary should I expect for my experience?\n- How do I transition to a new field?\n- What are the latest trends in my industry?",
+        height=100,
+        key="chat_input"
+    )
     
-    for message in st.session_state.chat_interview_messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+    col_send, col_clear = st.columns([3, 1])
     
-    if prompt := st.chat_input("Type your answer here..."):
-        st.session_state.chat_interview_messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.write(prompt)
-        
-        with st.chat_message("assistant"):
-            with st.spinner("Analyzing your answer..."):
-                user_data = st.session_state.get('user_data', {})
-                evaluation = interview_sim.groq_service.evaluate_interview_answer(
-                    st.session_state.current_question['question'],
-                    prompt,
-                    user_data
-                )
+    with col_send:
+        if st.button("💬 Send Message", type="primary", use_container_width=True):
+            if user_question.strip():
+                st.session_state.chat_history.append({"role": "user", "content": user_question})
                 
-                st.session_state.interview_answers.append(prompt)
-                st.session_state.interview_scores.append(evaluation.get('score', 5))
-                
-                score = evaluation.get('score', 5)
-                feedback_msg = f"**Score: {score}/10**\n\n"
-                
-                if evaluation.get('feedback'):
-                    feedback_msg += f"**Feedback:** {evaluation['feedback']}\n\n"
-                
-                if evaluation.get('strengths'):
-                    feedback_msg += "**Strengths:**\n"
-                    for strength in evaluation['strengths']:
-                        feedback_msg += f"• {strength}\n"
-                    feedback_msg += "\n"
-                
-                if evaluation.get('suggestions'):
-                    feedback_msg += f"**Suggestions:** {evaluation['suggestions']}\n\n"
-                
-                st.write(feedback_msg)
-                st.session_state.chat_interview_messages.append({"role": "assistant", "content": feedback_msg})
-                st.session_state.current_question_num += 1
-                
-                if st.session_state.current_question_num < job_info['num_questions']:
-                    if 'interview_questions' not in st.session_state:
-                        user_background = st.session_state.get('user_data', {})
-                        try:
-                            all_questions = interview_sim.groq_service.generate_interview_questions(
-                                job_info['job_description'], 
-                                user_background,
-                                num_questions=job_info['num_questions']
-                            )
-                            st.session_state.interview_questions = all_questions
-                        except Exception as e:
-                            st.error(f"❌ Error generating next question: {str(e)}")
-                            st.session_state.chat_interview_active = False
-                            st.session_state.interview_complete = True
-                            st.rerun()
-                            return
-                    
-                    if st.session_state.current_question_num < len(st.session_state.interview_questions):
-                        next_question = st.session_state.interview_questions[st.session_state.current_question_num]
-                        st.session_state.current_question = next_question
-                        
-                        next_q_msg = f"**Question {st.session_state.current_question_num + 1}:** {next_question['question']}"
-                        st.write(next_q_msg)
-                        st.session_state.chat_interview_messages.append({"role": "assistant", "content": next_q_msg})
-                    else:
-                        completion_msg = "🎉 **Interview Complete!** Thank you for your responses. Let me prepare your results..."
-                        st.write(completion_msg)
-                        st.session_state.chat_interview_messages.append({"role": "assistant", "content": completion_msg})
-                        st.session_state.chat_interview_active = False
-                        st.session_state.interview_complete = True
-                else:
-                    completion_msg = "🎉 **Interview Complete!** Thank you for your responses. Let me prepare your results..."
-                    st.write(completion_msg)
-                    st.session_state.chat_interview_messages.append({"role": "assistant", "content": completion_msg})
-                    st.session_state.chat_interview_active = False
-                    st.session_state.interview_complete = True
-                    
-                    avg_score = sum(st.session_state.interview_scores) / len(st.session_state.interview_scores)
-                    st.session_state.final_interview_report = {
-                        'overall_score': round(avg_score, 1),
-                        'questions_answered': len(st.session_state.interview_answers),
-                        'job_info': job_info,
-                        'answers': st.session_state.interview_answers,
-                        'scores': st.session_state.interview_scores
-                    }
-        
-        st.rerun()
+                with st.spinner("🤖 AI is thinking..."):
+                    try:
+                        response = groq_service.chat_with_resume(user_question, st.session_state.resume_context)
+                        st.session_state.chat_history.append({"role": "assistant", "content": response})
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error getting response: {str(e)}")
+            else:
+                st.error("⚠️ Please enter a question.")
     
-    if st.button("🛑 End Interview Early", type="secondary"):
-        st.session_state.chat_interview_active = False
-        st.session_state.interview_complete = True
-        
-        if st.session_state.interview_scores:
-            avg_score = sum(st.session_state.interview_scores) / len(st.session_state.interview_scores)
-            st.session_state.final_interview_report = {
-                'overall_score': round(avg_score, 1),
-                'questions_answered': len(st.session_state.interview_answers),
-                'job_info': job_info,
-                'answers': st.session_state.interview_answers,
-                'scores': st.session_state.interview_scores
-            }
-        st.rerun()
-
-def render_chat_interview_results(interview_sim):
-    st.subheader("🎉 Interview Results")
+    with col_clear:
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
     
-    if 'final_interview_report' not in st.session_state:
-        st.error("No interview results found. Please complete an interview first.")
-        return
-    
-    report = st.session_state.final_interview_report
-    job_info = report['job_info']
-    
-    if 'final_interview_report' in st.session_state:
-        session = {
-            'questions': [{'question': q} for q in st.session_state.get('interview_questions', [])],
-            'answers': st.session_state.get('interview_answers', [])
-        }
-    else:
-        session = {'questions': [], 'answers': []}
-    
-    st.balloons()
-    
-    score = report['overall_score']
-    if score >= 8:
-        st.success(f"🌟 Excellent Performance! Overall Score: {score}/10")
-        performance_level = "Excellent"
-    elif score >= 6:
-        st.info(f"👍 Good Performance! Overall Score: {score}/10")
-        performance_level = "Good"
-    elif score >= 4:
-        st.warning(f"📈 Fair Performance! Overall Score: {score}/10")
-        performance_level = "Fair"
-    else:
-        st.error(f"💪 Keep Practicing! Overall Score: {score}/10")
-        performance_level = "Needs Improvement"
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric("Overall Score", f"{score}/10")
-    
-    with col2:
-        st.metric("Questions Answered", report['questions_answered'])
-    st.markdown("---")
-    st.subheader("📊 Interview Summary")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"**Position:** {job_info['job_title']}")
-        if job_info['company']:
-            st.write(f"**Company:** {job_info['company']}")
-        st.write(f"**Experience Level:** {job_info['experience_level']}")
-    
-    with col2:
-        st.write(f"**Interview Type:** {job_info['interview_type']}")
-        st.write(f"**Difficulty:** {job_info['difficulty']}")
-        st.write(f"**Total Questions:** {job_info['num_questions']}")
-    
-    if st.checkbox("📝 Show Detailed Question-by-Question Feedback"):
+    if st.session_state.chat_history:
         st.markdown("---")
-        detailed_feedback = report.get('detailed_feedback', [])
-        if detailed_feedback:
-            for i, feedback in enumerate(detailed_feedback):
-                with st.expander(f"Question {i + 1} - Score: {feedback.get('score', 'N/A')}/10"):
-                    if i < len(session['questions']) and i < len(session['answers']):
-                        question = session['questions'][i]['question']
-                        answer = session['answers'][i]
-                        
-                        st.markdown(f"**❓ Question:** {question}")
-                        st.markdown(f"**💬 Your Answer:** {answer}")
-                        st.markdown(f"**🎯 Score:** {feedback.get('score', 'N/A')}/10")
-                        
-                        if feedback.get('feedback'):
-                            st.markdown(f"**🤖 AI Feedback:** {feedback['feedback']}")
-                        
-                        if feedback.get('strengths'):
-                            st.markdown("**✅ Strengths:**")
-                            for strength in feedback['strengths']:
-                                st.write(f"• {strength}")
-                        
-                        if feedback.get('weaknesses'):
-                            st.markdown("**📈 Improvement Areas:**")
-                            for weakness in feedback['weaknesses']:
-                                st.write(f"• {weakness}")
-        else:
-            st.info("No detailed feedback available for this interview.")
-    
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🔄 Practice Again", type="primary", use_container_width=True, key="practice_again_chat"):
-            keys_to_clear = [
-                'chat_interview_active', 'interview_complete', 'chat_interview_messages',
-                'current_question_num', 'interview_answers', 'interview_scores',
-                'current_question', 'final_interview_report', 'interview_job_info'
-            ]
-            for key in keys_to_clear:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
-    
-    with col2:
-        if st.button("💬 View Chat History", use_container_width=True):
-            if 'chat_interview_messages' in st.session_state:
-                with st.expander("Complete Interview Chat", expanded=True):
-                    for msg in st.session_state.chat_interview_messages:
-                        role_icon = "🤖" if msg["role"] == "assistant" else "👤"
-                        st.write(f"{role_icon} **{msg['role'].title()}:** {msg['content']}")
-    
-    with col3:
-        completion_rate = (report['questions_answered'] / job_info['num_questions']) * 100
+        st.markdown("### 📥 Export Chat")
         
-        report_text = f"""INTERVIEW PERFORMANCE REPORT
-========================================
-Position: {job_info['job_title']}
-Company: {job_info.get('company', 'Not specified')}
-Interview Type: {job_info['interview_type']}
-Experience Level: {job_info['experience_level']}
-Difficulty: {job_info['difficulty']}
-
-RESULTS:
-Overall Score: {score}/10
-Performance Level: {performance_level}
-Questions Answered: {report['questions_answered']}/{job_info['num_questions']}
-Completion Rate: {completion_rate:.0f}%
-
-DETAILED ANSWERS:
-"""
-        for i, (answer, score) in enumerate(zip(report['answers'], report['scores'])):
-            report_text += f"\nQuestion {i + 1} (Score: {score}/10):\n{answer}\n{'-' * 40}"
+        chat_text = "Resume Chat Session\n" + "="*50 + "\n\n"
+        for message in st.session_state.chat_history:
+            role = "You" if message['role'] == 'user' else "AI Assistant"
+            chat_text += f"{role}: {message['content']}\n\n"
+        
+        chat_text += f"\nGenerated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
         
         st.download_button(
-            label="📄 Download Report",
-            data=report_text,
-            file_name=f"interview_report_{job_info['job_title'].replace(' ', '_').lower()}.txt",
+            label="📥 Download Chat History",
+            data=chat_text,
+            file_name=f"resume_chat_{int(time.time())}.txt",
             mime="text/plain",
             use_container_width=True
         )
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-def render_detailed_job_view(job, index):
-    """Render detailed view of a job posting with enhanced AI insights"""
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.write(f"📍 **Location:** {job.get('location', 'N/A')}")
-        salary_display = format_salary_in_inr(job.get('salary_range', 'Not specified'))
-        st.write(f"💰 **Salary:** {salary_display}")
-        st.write(f"📅 **Posted:** {job.get('posted_date', 'Recently')}")
-        st.write(f"🏢 **Company Size:** {job.get('company_size', 'Not specified')}")
-        st.write(f"⏰ **Type:** {job.get('employment_type', 'Full-time')}")
-        
-        if job.get('remote_type'):
-            st.write("🏠 **Remote-friendly**")
-        
-        st.write(f"📋 **Description:** {job.get('description', 'No description available')[:300]}...")
-        
-        if job.get('skills'):
-            st.write(f"🛠️ **Key Skills:** {', '.join(job.get('skills', [])[:5])}")
-        
-        if job.get('benefits'):
-            st.write(f"💎 **Benefits:** {', '.join(job.get('benefits', [])[:3])}...")
-        
-        # Enhanced AI Analysis Section
-        if job.get('ai_analysis'):
-            analysis = job.get('ai_analysis')
-            st.markdown("**🤖 AI Analysis:**")
-            
-            # Create tabs for different insights
-            tab1, tab2, tab3 = st.tabs(["📊 Match Analysis", "💡 Market Insights", "🎯 Application Tips"])
-            
-            with tab1:
-                st.info(f"**Match Level:** {analysis.get('match_level', 'N/A')}")
-                if analysis.get('matched_keywords'):
-                    st.success(f"**Matched Keywords:** {', '.join(analysis.get('matched_keywords', [])[:5])}")
-                if analysis.get('missing_skills'):
-                    st.warning(f"**Skills to Develop:** {', '.join(analysis.get('missing_skills', [])[:3])}")
-            
-            with tab2:
-                market_insights = job.get('market_insights', {})
-                col_market1, col_market2 = st.columns(2)
-                with col_market1:
-                    st.metric("📈 Demand Level", market_insights.get('demand_level', 'Medium'))
-                    st.metric("💰 Salary Competitiveness", market_insights.get('salary_competitiveness', 'Competitive'))
-                with col_market2:
-                    st.metric("🚀 Growth Potential", market_insights.get('growth_potential', 'Good'))
-                    st.metric("🎯 Industry Trend", market_insights.get('industry_trend', 'Stable'))
-            
-            with tab3:
-                if job.get('application_tips'):
-                    for tip in job.get('application_tips', [])[:3]:
-                        st.info(f"💡 {tip}")
-                else:
-                    st.info("💡 Tailor your resume to highlight relevant experience")
-                    st.info("🎯 Research the company culture and values")
-                    st.info("📝 Write a compelling cover letter")
-    
-    with col2:
-        # Source indicator
-        source = job.get('source', 'web_scraper')
-        source_names = {
-            'indeed': 'Indeed',
-            'linkedin': 'LinkedIn',
-            'glassdoor': 'Glassdoor',
-            'google_jobs_api': 'Google Jobs',
-            'web_scraper': 'Multi-Platform'
-        }
-        st.info(f"🌐 **Source:** {source_names.get(source, 'Unknown')}")
-        
-        # Application buttons
-        platform_name = job.get('application_platform', 'LinkedIn')
-        platform_icon = job.get('platform_icon', '💼')
-        
-        if job.get('linkedin_url'):
-            st.link_button("💼 View on LinkedIn", job['linkedin_url'], use_container_width=True)
-        
-        if job.get('application_url'):
-            st.link_button(f"{platform_icon} Apply on {platform_name}", job['application_url'], use_container_width=True)
-        
-        # Enhanced action buttons
-        col_action1, col_action2 = st.columns(2)
-        
-        with col_action1:
-            if st.button(f"💾 Save Job", key=f"save_{index}", use_container_width=True):
-                if 'saved_jobs' not in st.session_state:
-                    st.session_state.saved_jobs = []
-                st.session_state.saved_jobs.append(job)
-                st.success("Job saved!")
-        
-        with col_action2:
-            if st.button(f"📝 Generate Cover Letter", key=f"cover_{index}", use_container_width=True):
-                st.session_state.cover_letter_job = job
-                st.success("Job selected for cover letter!")
-        
-        # AI match visualization
-        try:
-            match_score = int(str(job.get('ai_analysis', {}).get('match_score', job.get('ai_match_score', '0'))).replace('%', ''))
-            st.progress(match_score / 100, f"AI Match: {match_score}%")
-        except:
-            st.progress(0.7, "AI Match: Good")
-if __name__ == "__main__":
-    main()
+if page == "📤 Data Input":
+    data_input_page(data_extractor)
+elif page == "🌐 Portfolio Generator":
+    portfolio_page(groq_service, portfolio_gen)
+elif page == "📄 Resume Generator":
+    resume_page(groq_service, resume_gen)
+elif page == "✉️ Cover Letter Generator":
+    cover_letter_page(groq_service, cover_letter_gen)
+elif page == "🔍 Job Search":
+    job_search_page(job_searcher, groq_service)
+elif page == "🎤 Interview Simulator":
+    interview_page(interview_sim)
+elif page == "💬 Chat with Resume":
+    resume_chat_page(groq_service)

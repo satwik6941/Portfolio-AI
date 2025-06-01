@@ -132,39 +132,44 @@ class GroqLLM:
 
     def generate_enhanced_cover_letter(self, user_data: Dict[str, Any], job_description: str, 
                                         company_name: str, tone: str = "Professional") -> str:
-        """Generate a fully dynamic, AI-driven cover letter based on extracted user data"""
         
-        # Enhanced AI analysis of user's background
         user_skills = user_data.get('skills', [])
         user_experience = user_data.get('experience', [])
         user_projects = user_data.get('projects', [])
         
-        # Create comprehensive context from user data
         experience_context = ""
         if user_experience:
             experience_context = "\n📋 PROFESSIONAL EXPERIENCE:\n"
-            for exp in user_experience[:3]:  # Top 3 most relevant experiences
+            for exp in user_experience[:3]: 
                 if isinstance(exp, dict):
-                    experience_context += f"• {exp.get('position', 'Professional')} at {exp.get('company', 'Company')}\n"
-                    experience_context += f"  Duration: {exp.get('duration', 'Previous role')}\n"
-                    experience_context += f"  Achievements: {exp.get('description', 'Professional experience')[:200]}...\n\n"
+                    position = exp.get('position') or '[Position details to be specified]'
+                    company = exp.get('company') or '[Company name to be specified]'
+                    duration = exp.get('duration') or '[Duration to be specified]'
+                    description = exp.get('description') or '[Experience details to be highlighted]'
+                    
+                    experience_context += f"• {position} at {company}\n"
+                    experience_context += f"  Duration: {duration}\n"
+                    experience_context += f"  Achievements: {description[:200]}...\n\n"
         
         projects_context = ""
         if user_projects:
             projects_context = "\n🚀 KEY PROJECTS:\n"
-            for project in user_projects[:3]:  # Top 3 projects
+            for project in user_projects[:3]:
                 if isinstance(project, dict):
-                    projects_context += f"• {project.get('title', 'Project')}\n"
-                    projects_context += f"  Description: {project.get('description', 'Project details')[:150]}...\n"
-                    if project.get('technologies'):
-                        projects_context += f"  Technologies: {project.get('technologies')}\n"
+                    title = project.get('title') or '[Project title to be specified]'
+                    description = project.get('description') or '[Project description to be provided]'
+                    technologies = project.get('technologies') or ''
+                    
+                    projects_context += f"• {title}\n"
+                    projects_context += f"  Description: {description[:150]}...\n"
+                    if technologies:
+                        projects_context += f"  Technologies: {technologies}\n"
                     projects_context += "\n"
         
         skills_context = ""
         if user_skills:
             skills_context = f"\n🛠️ TECHNICAL SKILLS: {', '.join(user_skills[:15])}"
         
-        # Research unknown terms and enhance with context
         search_results = self.search_unknown_terms(job_description, f"{company_name} job requirements technical skills")
         
         search_context = ""
@@ -173,7 +178,6 @@ class GroqLLM:
             for term, explanation in search_results.items():
                 search_context += f"• {term}: {explanation}\n"
         
-        # Dynamic analysis of job requirements vs user profile
         job_analysis_prompt = f"""
         Analyze this job description and identify:
         1. Key technical requirements
@@ -196,12 +200,11 @@ class GroqLLM:
         Write a compelling, {tone.lower()} cover letter that demonstrates clear alignment between the candidate's background and the job requirements.
         
         🎯 TARGET ROLE: {company_name} - Position from job description
-        
-        👤 CANDIDATE PROFILE:
-        Name: {user_data.get('name', 'Candidate')}
-        Current Title: {user_data.get('title', 'Professional')}
-        Location: {user_data.get('location', 'Available to relocate')}
-        Summary: {user_data.get('summary', 'Experienced professional')}
+          👤 CANDIDATE PROFILE:
+        Name: {user_data.get('name', 'Candidate Name Not Provided')}
+        Current Title: {user_data.get('title') or 'Title Not Specified'}
+        Location: {user_data.get('location') or 'Location Flexible'}
+        Summary: {user_data.get('summary') or 'Professional background details to be highlighted'}
         {skills_context}
         {experience_context}
         {projects_context}
@@ -253,12 +256,10 @@ class GroqLLM:
         return self._make_request(messages, max_tokens=1500, temperature=0.7)
 
     def generate_enhanced_resume(self, user_data: Dict[str, Any]) -> str:
-        """Generate a dynamic, fully AI-driven resume based on extracted user data"""
         style = user_data.get('resume_style', 'Professional ATS-Optimized')
         skills_input = user_data.get('skills_input', '')
         projects = user_data.get('projects', [])
         
-        # Enhanced AI analysis of user's background
         all_content = f"""
         {user_data.get('summary', '')} 
         {skills_input} 
@@ -268,7 +269,6 @@ class GroqLLM:
         {' '.join([str(proj.get('description', '')) for proj in projects if isinstance(proj, dict)])}
         """
         
-        # Research unknown terms and enhance with context
         search_results = self.search_unknown_terms(all_content, "career skills technology industry trends")
         
         search_context = ""
@@ -277,7 +277,6 @@ class GroqLLM:
             for term, explanation in search_results.items():
                 search_context += f"• {term}: {explanation}\n"
         
-        # Dynamic projects analysis
         projects_context = ""
         if projects:
             projects_context = "\n\n📚 PROJECTS TO SHOWCASE (Transform using STAR methodology):\n"
@@ -293,17 +292,17 @@ class GroqLLM:
         prompt = f"""
         Create an enhanced, {style} resume for:
         
-        Name: {user_data.get('name', 'Your Name')}
-        Title: {user_data.get('title', 'Professional')}
-        Email: {user_data.get('email', 'email@example.com')}
-        Phone: {user_data.get('phone', 'Phone Number')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
-        Education: {user_data.get('education', 'Educational background')}
+        Name: {user_data.get('name') or '[Name to be provided]'}
+        Title: {user_data.get('title') or '[Professional title to be specified]'}
+        Email: {user_data.get('email') or '[Email address to be provided]'}
+        Phone: {user_data.get('phone') or '[Phone number to be provided]'}
+        Skills: {', '.join(user_data.get('skills', [])) if user_data.get('skills') else '[Skills to be specified]'}
+        Experience: {user_data.get('experience') or '[Professional experience to be detailed]'}
+        Education: {user_data.get('education') or '[Educational background to be provided]'}
         
         {search_context}
         {projects_context}
-          Create a professional resume with:
+        Create a professional resume with:
         1. Compelling professional summary using current industry terminology
         2. Quantified achievements with metrics
         3. Industry-specific keywords (informed by research above)
@@ -312,21 +311,21 @@ class GroqLLM:
         6. Relevant technical skills highlighted with proper context
         7. Current industry trends and terminology integration
         8. Projects section formatted using STAR method (Situation, Task, Action, Result) - analyze each project description and reformat to highlight the situation faced, tasks undertaken, actions taken, and measurable results achieved
-          FORMATTING REQUIREMENTS:
+            FORMATTING REQUIREMENTS:
         - Use **BOLD** formatting for ALL section headers (e.g., **PROFESSIONAL SUMMARY**, **CORE COMPETENCIES**, **PROFESSIONAL EXPERIENCE**, **PROJECTS**, **EDUCATION**)
         - Use **BOLD** formatting for job titles, company names, project titles, and degree titles
         - Use **BOLD** formatting for key achievement metrics and important skills
         - Section headers should be in ALL CAPS and bold: **SECTION NAME**
         
         IMPORTANT PROJECTS FORMATTING:
-        For each project, transform the raw description into STAR format where ONLY the project title is bold:
+        For each project, transform the raw description into STAR format (in the form of a paragraph) where ONLY the project title is bold:
         - **Project Name**: Description using STAR method
         - Situation: What was the context or challenge? (NOT bold)
         - Task: What needed to be accomplished? (NOT bold)
         - Action: What specific actions did you take? (NOT bold)
         - Result: What measurable outcomes were achieved? (NOT bold)
         
-        Do NOT make the words "Situation:", "Task:", "Action:", "Result:" bold. Only the project title should be bold.
+        Do NOT make the words "Situation:", "Task:", "Action:", "Result:" bold.
         
         Format for both ATS and human readability, ensuring technical terms are used correctly.
         """
@@ -375,16 +374,16 @@ class GroqLLM:
         prompt = f"""
         Create an ATS-optimized resume for:
         
-        Name: {user_data.get('name', 'Your Name')}
-        Title: {user_data.get('title', 'Professional')}
-        Email: {user_data.get('email', 'email@example.com')}
-        Phone: {user_data.get('phone', 'Phone Number')}
-        Skills: {', '.join(user_data.get('skills', []))}
-        Experience: {user_data.get('experience', 'Professional experience')}
-        Education: {user_data.get('education', 'Educational background')}
+        Name: {user_data.get('name') or '[Name to be provided]'}
+        Title: {user_data.get('title') or '[Professional title to be specified]'}
+        Email: {user_data.get('email') or '[Email address to be provided]'}
+        Phone: {user_data.get('phone') or '[Phone number to be provided]'}
+        Skills: {', '.join(user_data.get('skills', [])) if user_data.get('skills') else '[Skills to be specified]'}
+        Experience: {user_data.get('experience') or '[Professional experience to be detailed]'}
+        Education: {user_data.get('education') or '[Educational background to be provided]'}
         {tailoring_context}
         {projects_context}
-          Create a professional, ATS-friendly resume with:
+        Create a professional, ATS-friendly resume with:
         1. Contact information
         2. Professional summary (3-4 lines)
         3. Core competencies/skills
@@ -425,7 +424,6 @@ class GroqLLM:
         return self._make_request(messages, max_tokens=2000, temperature=0.6)
 
     def generate_interview_questions(self, job_description: str, user_data: Dict[str, Any], num_questions: int = 5) -> List[Dict]:
-        # Safely extract user data with defaults
         name = str(user_data.get('name', 'Candidate'))
         title = str(user_data.get('title', 'Professional'))
         skills = user_data.get('skills', [])
@@ -481,7 +479,6 @@ class GroqLLM:
                 return questions if isinstance(questions, list) else []
         except Exception as e:
             print(f"Error generating interview questions: {e}")
-          # Fallback questions
         return [
             {"question": "Tell me about yourself and your background.", "type": "General", "difficulty": "Easy", "category": "Introduction"},
             {"question": "Why are you interested in this position?", "type": "Behavioral", "difficulty": "Easy", "category": "Motivation"},
@@ -495,7 +492,6 @@ class GroqLLM:
         return questions[0]['question'] if questions else "Tell me about your experience and background."
 
     def evaluate_interview_answer(self, question: str, answer: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        # Safely extract user data with defaults
         skills = user_data.get('skills', [])
         if isinstance(skills, list):
             skills_str = ', '.join(str(skill) for skill in skills)
@@ -504,7 +500,6 @@ class GroqLLM:
         
         experience = str(user_data.get('experience', 'Professional experience'))
         
-        # Escape any problematic characters in the strings
         question_safe = str(question).replace('{', '{{').replace('}', '}}')
         answer_safe = str(answer).replace('{', '{{').replace('}', '}}')
         
@@ -550,7 +545,6 @@ class GroqLLM:
         except Exception as e:
             print(f"Error in evaluate_interview_answer: {e}")
         
-        # Fallback response
         return {
             "score": 7,
             "strengths": ["Good effort"],
@@ -560,7 +554,6 @@ class GroqLLM:
         }
 
     def generate_chat_interview_question(self, context: str, user_data: Dict[str, Any], question_number: int) -> str:
-        # Safely extract user data
         skills = user_data.get('skills', [])
         if isinstance(skills, list):
             skills_str = ', '.join(str(skill) for skill in skills)
@@ -656,16 +649,13 @@ class GroqLLM:
             }
 
     def analyze_job_matches(self, jobs: List[Dict[str, Any]], user_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Analyze job matches against user profile and enhance job data with AI insights"""
         enhanced_jobs = []
         
         for job in jobs:
             try:
-                # Get job description for analysis
                 job_desc = job.get('description', '')
                 job_title = job.get('title', '')
                 
-                # Create analysis prompt
                 prompt = f"""
                 Analyze this job posting against the candidate's profile:
                 
@@ -698,7 +688,6 @@ class GroqLLM:
                 response = self._make_request(messages, max_tokens=500, temperature=0.3)
                 
                 try:
-                    # Try to parse JSON response
                     json_start = response.find('{')
                     json_end = response.rfind('}') + 1
                     if json_start != -1 and json_end != 0:
@@ -707,7 +696,6 @@ class GroqLLM:
                         job['ai_analysis'] = analysis
                         job['ai_match_score'] = analysis.get('match_score', 75)
                     else:
-                        # Fallback if JSON parsing fails
                         job['ai_analysis'] = {
                             "match_score": 75,
                             "match_level": "Good",
@@ -718,7 +706,6 @@ class GroqLLM:
                         }
                         job['ai_match_score'] = 75
                 except:
-                    # Fallback analysis
                     job['ai_analysis'] = {
                         "match_score": 75,
                         "match_level": "Good",
@@ -730,7 +717,6 @@ class GroqLLM:
                     job['ai_match_score'] = 75
                 
             except Exception as e:
-                # Add fallback analysis if anything goes wrong
                 job['ai_analysis'] = {
                     "match_score": 70,
                     "match_level": "Fair",
@@ -743,7 +729,6 @@ class GroqLLM:
             
             enhanced_jobs.append(job)
         
-        # Sort jobs by match score (highest first)
         enhanced_jobs.sort(key=lambda x: x.get('ai_match_score', 0), reverse=True)
         return enhanced_jobs
 
@@ -776,7 +761,7 @@ class GroqLLM:
         5. Help optimize for ATS systems
         6. Suggest additional skills or experiences to highlight
         7. Help tailor the resume for specific jobs
-          Be conversational, supportive, and provide actionable advice.
+        Be conversational, supportive, and provide actionable advice.
         """
         messages = [
             {"role": "system", "content": "You are a friendly and expert career counselor who helps people improve their resumes. Be conversational, supportive, and provide specific, actionable advice."},
@@ -786,11 +771,7 @@ class GroqLLM:
         return self._make_request(messages, max_tokens=1000, temperature=0.7)
 
     def chat_with_resume(self, user_message: str, context: str) -> str:
-        """
-        Chat with resume functionality - wrapper for chat_about_resume
-        """
         try:
-            # Use the existing chat_about_resume method with correct parameter order
             return self.chat_about_resume(context, user_message, chat_history=None)
         except Exception as e:
             return f"I apologize, but I encountered an error while processing your request: {str(e)}. Please try asking your question in a different way."
@@ -839,7 +820,6 @@ class GroqLLM:
             }
 
     def parse_resume_data(self, resume_text: str) -> Dict[str, Any]:
-        """Enhanced LLM-based resume parsing with comprehensive analysis"""
         prompt = f"""
         As an expert resume analyst, perform a comprehensive analysis and extraction of ALL information from this resume text. Extract every detail accurately and completely.
 
@@ -902,49 +882,49 @@ class GroqLLM:
         CRITICAL EXTRACTION GUIDELINES:
 
         1. **PROJECTS - Extract EVERYTHING that resembles a project:**
-           - Dedicated project sections
-           - Work projects mentioned in job descriptions
-           - Academic/thesis projects
-           - Personal/side projects
-           - Open source contributions
-           - Hackathon projects
-           - Portfolio pieces
-           - Apps, websites, tools, software developed
-           - Research projects
-           - Capstone projects
-           - Freelance work
-           - ANY mentions of building, creating, developing, designing, implementing
+        - Dedicated project sections
+        - Work projects mentioned in job descriptions
+        - Academic/thesis projects
+        - Personal/side projects
+        - Open source contributions
+        - Hackathon projects
+        - Portfolio pieces
+        - Apps, websites, tools, software developed
+        - Research projects
+        - Capstone projects
+        - Freelance work
+        - ANY mentions of building, creating, developing, designing, implementing
 
         2. **SKILLS - Be exhaustive:**
-           - Programming languages (Python, Java, JavaScript, etc.)
-           - Frameworks and libraries (React, Django, TensorFlow, etc.)
-           - Tools and software (Git, Docker, AWS, Figma, etc.)
-           - Technical skills (Machine Learning, Data Analysis, etc.)
-           - Soft skills (Leadership, Communication, etc.)
-           - Industry-specific skills
-           - Certifications and qualifications
+        - Programming languages (Python, Java, JavaScript, etc.)
+        - Frameworks and libraries (React, Django, TensorFlow, etc.)
+        - Tools and software (Git, Docker, AWS, Figma, etc.)
+        - Technical skills (Machine Learning, Data Analysis, etc.)
+        - Soft skills (Leadership, Communication, etc.)
+        - Industry-specific skills
+        - Certifications and qualifications
 
         3. **EXPERIENCE - Extract complete work history:**
-           - Include internships, part-time jobs, freelance work
-           - Extract specific achievements with numbers/metrics
-           - Include all responsibilities and accomplishments
+        - Include internships, part-time jobs, freelance work
+        - Extract specific achievements with numbers/metrics
+        - Include all responsibilities and accomplishments
 
         4. **EDUCATION - Complete academic background:**
-           - All degrees, diplomas, certificates
-           - Relevant coursework, thesis topics
-           - Academic achievements, GPA, honors
+        - All degrees, diplomas, certificates
+        - Relevant coursework, thesis topics
+        - Academic achievements, GPA, honors
 
         5. **Contact Information - Extract all available:**
-           - Full name, professional email, phone
-           - LinkedIn profile, personal website, GitHub
-           - Location/address information
+        - Full name, professional email, phone
+        - LinkedIn profile, personal website, GitHub
+        - Location/address information
 
         6. **Quality Standards:**
-           - Extract exact text, don't paraphrase
-           - Include metrics, percentages, dollar amounts
-           - Preserve technical terminology
-           - Use "Not found" only if truly absent
-           - Ensure valid JSON with proper escaping
+        - Extract exact text, don't paraphrase
+        - Include metrics, percentages, dollar amounts
+        - Preserve technical terminology
+        - Use "Not found" only if truly absent
+        - Ensure valid JSON with proper escaping
 
         Analyze every line of the resume. Don't miss any information that could be valuable for career development.
         """
@@ -962,7 +942,6 @@ class GroqLLM:
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 parsed_data = json.loads(json_str)
-                  # Process and validate extracted data
                 parsed_data = self._validate_and_enhance_parsed_data(parsed_data)
                 
                 return parsed_data
@@ -971,9 +950,7 @@ class GroqLLM:
             return self._fallback_resume_parsing(resume_text)
     
     def _validate_and_enhance_parsed_data(self, parsed_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and enhance the parsed resume data"""
         try:
-            # Ensure all required fields exist with proper defaults
             required_fields = {
                 'name': 'Not found',
                 'email': 'Not found',
@@ -995,23 +972,18 @@ class GroqLLM:
                 'additional_sections': {}
             }
             
-            # Set defaults for missing fields
             for field, default_value in required_fields.items():
                 if field not in parsed_data or parsed_data[field] is None:
                     parsed_data[field] = default_value
             
-            # Validate and clean skills
             if isinstance(parsed_data.get('skills'), str):
                 parsed_data['skills'] = [skill.strip() for skill in parsed_data['skills'].split(',') if skill.strip()]
             elif not isinstance(parsed_data.get('skills'), list):
                 parsed_data['skills'] = []
             
-            # Ensure skills are unique and not empty
             parsed_data['skills'] = list(set([skill for skill in parsed_data['skills'] if skill and isinstance(skill, str) and len(skill.strip()) > 1]))
             
-            # Validate experience format
             if not isinstance(parsed_data.get('experience'), list):
-                # If experience is a string, try to convert to basic structure
                 exp_text = str(parsed_data.get('experience', ''))
                 if exp_text and exp_text != 'Not found':
                     parsed_data['experience'] = [{
@@ -1024,7 +996,6 @@ class GroqLLM:
                 else:
                     parsed_data['experience'] = []
             
-            # Validate education format
             if not isinstance(parsed_data.get('education'), list):
                 edu_text = str(parsed_data.get('education', ''))
                 if edu_text and edu_text != 'Not found':
@@ -1037,11 +1008,9 @@ class GroqLLM:
                 else:
                     parsed_data['education'] = []
             
-            # Validate projects format
             if not isinstance(parsed_data.get('projects'), list):
                 parsed_data['projects'] = []
             
-            # Clean and validate project entries
             clean_projects = []
             for project in parsed_data.get('projects', []):
                 if isinstance(project, dict) and project.get('title'):
@@ -1056,25 +1025,21 @@ class GroqLLM:
                     }
                     clean_projects.append(clean_project)
             
-            parsed_data['projects'] = clean_projects[:10]  # Limit to 10 projects max
+            parsed_data['projects'] = clean_projects[:10]  
             
-            # Clean string fields to prevent issues
             string_fields = ['name', 'email', 'phone', 'title', 'location', 'linkedin', 'website', 'summary']
             for field in string_fields:
                 if isinstance(parsed_data.get(field), str):
                     parsed_data[field] = parsed_data[field].strip()
-                    if len(parsed_data[field]) > 500:  # Reasonable limit
+                    if len(parsed_data[field]) > 500: 
                         parsed_data[field] = parsed_data[field][:500] + '...'
             
-            # Validate list fields
             list_fields = ['certifications', 'languages', 'publications', 'awards', 'volunteer_experience']
             for field in list_fields:
                 if not isinstance(parsed_data.get(field), list):
                     parsed_data[field] = []
-                # Ensure all items are strings and reasonable length
                 parsed_data[field] = [str(item)[:200] for item in parsed_data[field] if item][:10]
             
-            # Validate additional_sections
             if not isinstance(parsed_data.get('additional_sections'), dict):
                 parsed_data['additional_sections'] = {}
             
@@ -1082,7 +1047,6 @@ class GroqLLM:
             
         except Exception as e:
             print(f"Error validating parsed data: {e}")
-            # Return minimal safe structure
             return {
                 'name': 'Error in processing',
                 'email': 'Not found',
@@ -1140,7 +1104,6 @@ class GroqLLM:
             if match:
                 parsed_data["experience"] = match.group()[:200] + "..."
                 break
-          # Enhanced project extraction for fallback
         project_sections = ['project', 'portfolio', 'work', 'experience', 'academic', 'capstone', 'research']
         project_keywords = [
             'built', 'developed', 'created', 'designed', 'implemented', 'programmed',
@@ -1149,44 +1112,35 @@ class GroqLLM:
         ]
         projects = []
         
-        # Split text into sections and lines for analysis
         text_lines = resume_text.split('\n')
         current_section = ""
         
         for i, line in enumerate(text_lines):
             line = line.strip()
             
-            # Identify project sections
             if any(section in line.lower() for section in project_sections) and len(line) < 50:
                 current_section = line.lower()
                 continue
             
-            # Look for project indicators
             if any(keyword in line.lower() for keyword in project_keywords):
-                if len(line) > 10 and len(line) < 150:  # Reasonable project title/description length
-                    # Extract title (try to clean it up)
+                if len(line) > 10 and len(line) < 150:  
                     title = line
                     if title.startswith('•') or title.startswith('-') or title.startswith('*'):
                         title = title[1:].strip()
                     
-                    # Try to get more comprehensive description from surrounding lines
                     description_parts = []
                     
-                    # Look at current line and next few lines for description
                     for j in range(i, min(i+4, len(text_lines))):
                         desc_line = text_lines[j].strip()
                         if desc_line and len(desc_line) > 15:
-                            # Clean up bullet points
                             if desc_line.startswith('•') or desc_line.startswith('-') or desc_line.startswith('*'):
                                 desc_line = desc_line[1:].strip()
                             
-                            # Add to description if it's substantial
                             if any(tech_word in desc_line.lower() for tech_word in ['using', 'with', 'implemented', 'achieved', 'resulted']):
                                 description_parts.append(desc_line)
                     
                     description = " ".join(description_parts[:2]) if description_parts else title
                     
-                    # Try to extract technologies mentioned nearby
                     technologies = []
                     tech_keywords = [
                         'python', 'javascript', 'java', 'react', 'node', 'html', 'css', 'sql',
@@ -1195,13 +1149,11 @@ class GroqLLM:
                         'numpy', 'scikit', 'tableau', 'powerbi', 'excel', 'r', 'matlab', 'c++', 'c#'
                     ]
                     
-                    # Look for technologies in the description and surrounding text
                     search_text = " ".join(text_lines[max(0, i-1):min(len(text_lines), i+3)]).lower()
                     for tech in tech_keywords:
                         if tech in search_text:
                             technologies.append(tech.capitalize())
                     
-                    # Extract duration if mentioned
                     duration = "Not specified"
                     duration_patterns = [
                         r'\d+\s*months?', r'\d+\s*weeks?', r'\d+\s*years?',
@@ -1214,16 +1166,13 @@ class GroqLLM:
                             duration = match.group()
                             break
                     
-                    # Only add if it looks like a legitimate project
                     if len(title) > 5 and not title.lower().startswith('experience'):
                         projects.append({
-                            "title": title[:100],  # Limit title length
+                            "title": title[:100],
                             "description": description[:300] if description else "Project details available upon request",
-                            "technologies": ", ".join(technologies[:5]) if technologies else "Not specified",
-                            "duration": duration
+                            "technologies": ", ".join(technologies[:5]) if technologies else "Not specified",                            "duration": duration
                         })
         
-        # Remove duplicates and limit results
         unique_projects = []
         seen_titles = set()
         for project in projects:
@@ -1231,7 +1180,7 @@ class GroqLLM:
             if title_lower not in seen_titles and len(title_lower) > 3:
                 seen_titles.add(title_lower)
                 unique_projects.append(project)
-                if len(unique_projects) >= 5:  # Limit to 5 projects for fallback
+                if len(unique_projects) >= 5:
                     break
         
         parsed_data["projects"] = unique_projects
@@ -1239,9 +1188,27 @@ class GroqLLM:
         return parsed_data
     
     def generate_enhanced_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        # Check if user wants AI-generated projects
+        include_projects = user_data.get('include_projects', False)
+        
+        # Create the prompt based on whether projects should be generated
+        if include_projects:
+            projects_instruction = '''
+            "projects": [
+                {
+                    "name": "Project Name",
+                    "description": "Brief project description highlighting achievements",
+                    "technologies": ["tech1", "tech2"]
+                }
+            ],'''
+        else:
+            projects_instruction = '''
+            "projects": [],'''
+            
         prompt = f"""
         Create a comprehensive and professional portfolio content for the following person.
         Make it engaging, well-structured, and highlight their strengths and achievements.
+        IMPORTANT: Use the actual user data provided below. Only enhance the content, don't replace real information.
         
         User Data:
         Name: {user_data.get('name', 'N/A')}
@@ -1260,14 +1227,7 @@ class GroqLLM:
         {{
             "headline": "Professional headline/tagline",
             "about": "Compelling professional summary",
-            "skills": ["skill1", "skill2", "skill3"],
-            "projects": [
-                {{
-                    "name": "Project Name",
-                    "description": "Brief project description highlighting achievements",
-                    "technologies": ["tech1", "tech2"]
-                }}
-            ],
+            "skills": ["skill1", "skill2", "skill3"],{projects_instruction}
             "experience": [
                 {{
                     "title": "Job Title",
@@ -1282,7 +1242,7 @@ class GroqLLM:
         
         Make it professional, compelling, and tailored to showcase their unique value proposition.
         Use modern, engaging language and highlight quantifiable achievements where possible.
-        Return only valid JSON.        """
+        {"If include_projects is False, do NOT generate any projects - return an empty projects array." if not include_projects else ""}        Return only valid JSON.        """
         
         messages = [
             {"role": "system", "content": "You are a professional portfolio writer. Create structured portfolio data in JSON format only."},
@@ -1292,35 +1252,45 @@ class GroqLLM:
         try:
             response = self._make_request(messages, max_tokens=2500, temperature=0.8)
             
-            # Clean and extract JSON response with better error handling
             json_start = response.find('{')
             json_end = response.rfind('}') + 1
-            
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
-                
-                # Clean the JSON string to fix common issues
                 json_str = json_str.strip()
-                # Fix trailing commas before closing braces/brackets
                 json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
-                # Ensure proper quote escaping
                 json_str = json_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
                 
                 try:
                     portfolio_data = json.loads(json_str)
                     
-                    # Validate and clean the portfolio data structure
                     if not isinstance(portfolio_data, dict):
                         raise ValueError("Portfolio data is not a dictionary")
                     
-                    # Ensure required fields exist with defaults
+                    # Use actual user data when available, only enhance if missing
                     portfolio_data.setdefault('headline', f"{user_data.get('title', 'Professional')} | Technology Expert")
-                    portfolio_data.setdefault('about', 'Experienced professional with a passion for innovation')
+                    portfolio_data.setdefault('about', user_data.get('summary', 'Experienced professional with a passion for innovation'))
                     portfolio_data.setdefault('skills', user_data.get('skills', []))
-                    portfolio_data.setdefault('projects', [])
-                    portfolio_data.setdefault('experience', [])
+                    
+                    # Handle projects based on include_projects setting
+                    if not user_data.get('include_projects', False):
+                        portfolio_data['projects'] = []
+                    else:
+                        portfolio_data.setdefault('projects', [])
+                      # Use actual user experience data if available
+                    if user_data.get('work_experience'):
+                        portfolio_data['experience'] = user_data['work_experience']
+                    elif user_data.get('experience'):
+                        portfolio_data.setdefault('experience', [{
+                            'title': user_data.get('title', 'Professional'),
+                            'company': 'Professional Experience',
+                            'duration': 'Current',
+                            'description': user_data.get('experience')
+                        }])
+                    else:
+                        portfolio_data.setdefault('experience', [])
+                    
                     portfolio_data.setdefault('education', user_data.get('education', ''))
-                    portfolio_data.setdefault('certifications', [])
+                    portfolio_data.setdefault('certifications', user_data.get('certifications', []))
                     
                     return portfolio_data
                     
@@ -1337,188 +1307,203 @@ class GroqLLM:
             return self._create_fallback_portfolio(user_data)
     
     def _create_fallback_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a fallback portfolio structure when AI generation fails"""
-        return {
-            "headline": f"{user_data.get('title', 'Professional')} | Experienced in Technology & Innovation",
-            "about": f"Accomplished {user_data.get('title', 'professional')} with extensive experience in delivering high-quality solutions. Passionate about technology and innovation with a proven track record of success.",
-            "skills": user_data.get('skills', ['Leadership', 'Problem Solving', 'Communication', 'Technical Skills']),
-            "projects": [
+        # Create projects only if include_projects is True
+        projects = []
+        if user_data.get('include_projects', False):
+            projects = [
                 {
                     "name": "Professional Project Portfolio",
                     "description": "Comprehensive collection of professional projects demonstrating technical expertise and problem-solving capabilities",
                     "technologies": user_data.get('skills', ['Various Technologies'])[:3]
                 }
-            ],
-            "experience": [
-                {
-                    "title": user_data.get('title', 'Professional'),
-                    "company": "Professional Experience",
-                    "duration": "Current",
-                    "achievements": ["Delivered high-quality solutions", "Collaborated with cross-functional teams", "Contributed to organizational success"]
-                }
-            ],
+            ]
+        
+        # Use actual user experience if available
+        experience = []
+        if user_data.get('work_experience'):
+            experience = user_data['work_experience']
+        elif user_data.get('experience'):
+            experience = [{
+                "title": user_data.get('title', 'Professional'),
+                "company": "Professional Experience",
+                "duration": "Current",
+                "description": user_data.get('experience')
+            }]
+        else:
+            experience = [{
+                "title": user_data.get('title', 'Professional'),
+                "company": "Professional Experience",
+                "duration": "Current",
+                "achievements": ["Delivered high-quality solutions", "Collaborated with cross-functional teams", "Contributed to organizational success"]
+            }]
+        
+        return {
+            "headline": f"{user_data.get('title', 'Professional')} | Experienced in Technology & Innovation",
+            "about": user_data.get('summary', f"Accomplished {user_data.get('title', 'professional')} with extensive experience in delivering high-quality solutions. Passionate about technology and innovation with a proven track record of success."),
+            "skills": user_data.get('skills', ['Leadership', 'Problem Solving', 'Communication', 'Technical Skills']),
+            "projects": projects,
+            "experience": experience,
             "education": user_data.get('education', 'Educational background in relevant field'),
             "certifications": user_data.get('certifications', ['Professional Certifications'])
         }
 
-    def generate_deployment_guide(self, hosting_option: str, user_data: Dict[str, Any]) -> str:
-        """Generate deployment guide for the specified hosting option."""
-        prompt = f"""
-        Create a detailed deployment guide for hosting a portfolio website on {hosting_option}.
+    # def generate_deployment_guide(self, hosting_option: str, user_data: Dict[str, Any]) -> str:
+    #     prompt = f"""
+    #     Create a detailed deployment guide for hosting a portfolio website on {hosting_option}.
         
-        The portfolio is for: {user_data.get('name', 'the user')}
-        Portfolio type: Professional portfolio website
+    #     The portfolio is for: {user_data.get('name', 'the user')}
+    #     Portfolio type: Professional portfolio website
         
-        Please provide:
-        1. Step-by-step deployment instructions
-        2. Prerequisites and requirements
-        3. Configuration steps
-        4. Best practices for {hosting_option}
-        5. Common troubleshooting tips
-        6. Cost considerations (if any)
-        7. Domain setup (if applicable)
-        8. SSL certificate setup
-        9. Performance optimization tips
+    #     Please provide:
+    #     1. Step-by-step deployment instructions
+    #     2. Prerequisites and requirements
+    #     3. Configuration steps
+    #     4. Best practices for {hosting_option}
+    #     5. Common troubleshooting tips
+    #     6. Cost considerations (if any)
+    #     7. Domain setup (if applicable)
+    #     8. SSL certificate setup
+    #     9. Performance optimization tips
         
-        Make the guide beginner-friendly but comprehensive.
-        Include specific commands, code snippets, and configuration examples where relevant.
-        """
+    #     Make the guide beginner-friendly but comprehensive.
+    #     Include specific commands, code snippets, and configuration examples where relevant.
+    #     """
         
-        messages = [
-            {"role": "system", "content": f"You are an expert in web deployment and hosting, specifically knowledgeable about {hosting_option} deployment strategies."},
-            {"role": "user", "content": prompt}
-        ]
+    #     messages = [
+    #         {"role": "system", "content": f"You are an expert in web deployment and hosting, specifically knowledgeable about {hosting_option} deployment strategies."},
+    #         {"role": "user", "content": prompt}
+    #     ]
         
-        try:
-            return self._make_request(messages, max_tokens=2000, temperature=0.7)
-        except Exception as e:
-            return f"Error generating deployment guide: {str(e)}"
+    #     try:
+    #         return self._make_request(messages, max_tokens=2000, temperature=0.7)
+    #     except Exception as e:
+    #         return f"Error generating deployment guide: {str(e)}"
 
-    def get_deployment_quick_start(self, hosting_option: str) -> str:
-        quick_starts = {
-            "Netlify": """
-            🚀 **Netlify Quick Start**
+    # def get_deployment_quick_start(self, hosting_option: str) -> str:
+    #     quick_starts = {
+    #         "Netlify": """
+    #         🚀 **Netlify Quick Start**
             
-            1. **Connect Repository**
-                - Link your GitHub/GitLab repository
-                - Authorize Netlify access
+    #         1. **Connect Repository**
+    #             - Link your GitHub/GitLab repository
+    #             - Authorize Netlify access
             
-            2. **Configure Build Settings**
-                - Build command: `npm run build` or `yarn build`
-                - Publish directory: `dist` or `build`
+    #         2. **Configure Build Settings**
+    #             - Build command: `npm run build` or `yarn build`
+    #             - Publish directory: `dist` or `build`
             
-            3. **Deploy**
-                - Click "Deploy Site"
-                - Get your live URL instantly
+    #         3. **Deploy**
+    #             - Click "Deploy Site"
+    #             - Get your live URL instantly
             
-            4. **Custom Domain (Optional)**
-                - Go to Domain settings
-                - Add your custom domain
-                - Configure DNS
+    #         4. **Custom Domain (Optional)**
+    #             - Go to Domain settings
+    #             - Add your custom domain
+    #             - Configure DNS
             
-            **Pro Tips:**
-            - Enable branch deploys for testing
-            - Set up form handling for contact forms
-            - Use Netlify Functions for serverless features
-            """,
+    #         **Pro Tips:**
+    #         - Enable branch deploys for testing
+    #         - Set up form handling for contact forms
+    #         - Use Netlify Functions for serverless features
+    #         """,
             
-            "Vercel": """
-            🚀 **Vercel Quick Start**
+    #         "Vercel": """
+    #         🚀 **Vercel Quick Start**
             
-            1. **Import Project**
-                - Connect your Git repository
-                - Select framework preset (React, Next.js, etc.)
+    #         1. **Import Project**
+    #             - Connect your Git repository
+    #             - Select framework preset (React, Next.js, etc.)
             
-            2. **Configure Project**
-                - Build command: `npm run build`
-                - Output directory: `out` or `dist`
+    #         2. **Configure Project**
+    #             - Build command: `npm run build`
+    #             - Output directory: `out` or `dist`
             
-            3. **Deploy**
-                - Click "Deploy"
-                - Get your production URL
+    #         3. **Deploy**
+    #             - Click "Deploy"
+    #             - Get your production URL
             
-            4. **Custom Domain**
-                - Add domain in project settings
-                - Configure nameservers
+    #         4. **Custom Domain**
+    #             - Add domain in project settings
+    #             - Configure nameservers
             
-            **Pro Tips:**
-            - Use Vercel Analytics for insights
-            - Enable preview deployments
-            - Set up environment variables for APIs
-            """,
+    #         **Pro Tips:**
+    #         - Use Vercel Analytics for insights
+    #         - Enable preview deployments
+    #         - Set up environment variables for APIs
+    #         """,
             
-            "GitHub Pages": """
-            🚀 **GitHub Pages Quick Start**
+    #         "GitHub Pages": """
+    #         🚀 **GitHub Pages Quick Start**
             
-            1. **Repository Setup**
-                - Create public repository
-                - Upload your portfolio files
+    #         1. **Repository Setup**
+    #             - Create public repository
+    #             - Upload your portfolio files
             
-            2. **Enable GitHub Pages**
-                - Go to Settings > Pages
-                - Select source branch (main/gh-pages)
+    #         2. **Enable GitHub Pages**
+    #             - Go to Settings > Pages
+    #             - Select source branch (main/gh-pages)
             
-            3. **Configure**
-                - Choose root folder or `/docs`
-                - Wait for deployment
+    #         3. **Configure**
+    #             - Choose root folder or `/docs`
+    #             - Wait for deployment
             
-            4. **Access Your Site**
-                - URL: `username.github.io/repository-name`
+    #         4. **Access Your Site**
+    #             - URL: `username.github.io/repository-name`
             
-            **Pro Tips:**
-            - Use GitHub Actions for automated builds
-            - Add CNAME file for custom domains
-            - Keep repository public for free hosting
-            """,
+    #         **Pro Tips:**
+    #         - Use GitHub Actions for automated builds
+    #         - Add CNAME file for custom domains
+    #         - Keep repository public for free hosting
+    #         """,
             
-            "Firebase": """
-            🚀 **Firebase Hosting Quick Start**
+    #         "Firebase": """
+    #         🚀 **Firebase Hosting Quick Start**
             
-            1. **Setup Firebase CLI**
-                ```bash
-                npm install -g firebase-tools
-                firebase login
-                ```
+    #         1. **Setup Firebase CLI**
+    #             ```bash
+    #             npm install -g firebase-tools
+    #             firebase login
+    #             ```
             
-            2. **Initialize Project**
-                ```bash
-                firebase init hosting
-                ```
+    #         2. **Initialize Project**
+    #             ```bash
+    #             firebase init hosting
+    #             ```
             
-            3. **Deploy**
-                ```bash
-                firebase deploy
-                ```
+    #         3. **Deploy**
+    #             ```bash
+    #             firebase deploy
+    #             ```
             
-            4. **Custom Domain**
-                - Add domain in Firebase Console
-                - Update DNS records
+    #         4. **Custom Domain**
+    #             - Add domain in Firebase Console
+    #             - Update DNS records
             
-            **Pro Tips:**
-            - Use Firebase Analytics
-            - Enable caching rules
-            - Set up multiple environments
-            """
-        }
+    #         **Pro Tips:**
+    #         - Use Firebase Analytics
+    #         - Enable caching rules
+    #         - Set up multiple environments
+    #         """
+    #     }
         
-        return quick_starts.get(hosting_option, f"""
-        🚀 **{hosting_option} Quick Start**
+    #     return quick_starts.get(hosting_option, f"""
+    #     🚀 **{hosting_option} Quick Start**
         
-        1. **Prepare Your Files**
-            - Ensure all HTML, CSS, JS files are ready
-            - Test locally before deployment
+    #     1. **Prepare Your Files**
+    #         - Ensure all HTML, CSS, JS files are ready
+    #         - Test locally before deployment
         
-        2. **Upload to {hosting_option}**
-            - Follow the platform's upload process
-            - Configure any necessary settings
+    #     2. **Upload to {hosting_option}**
+    #         - Follow the platform's upload process
+    #         - Configure any necessary settings
         
-        3. **Configure Domain**
-            - Set up custom domain if needed
-            - Configure SSL certificate
+    #     3. **Configure Domain**
+    #         - Set up custom domain if needed
+    #         - Configure SSL certificate
         
-        4. **Test & Optimize**
-            - Check all links and functionality
-            - Optimize for performance
+    #     4. **Test & Optimize**
+    #         - Check all links and functionality
+    #         - Optimize for performance
         
-        For detailed instructions, refer to {hosting_option}'s official documentation.
-        """)
+    #     For detailed instructions, refer to {hosting_option}'s official documentation.
+    #     """)

@@ -100,6 +100,9 @@ class InterviewUI:
         with col1:
             job_title = st.text_input("Job Title", placeholder="e.g., Software Engineer")
             company = st.text_input("Company", placeholder="e.g., Google")
+            # Add number of questions slider
+            num_questions = st.slider("Number of Questions", min_value=3, max_value=15, value=5, 
+                                    help="Choose how many questions you want to practice with")
         
         with col2:
             experience_level = st.selectbox("Experience Level", 
@@ -107,6 +110,12 @@ class InterviewUI:
             
             interview_type = st.selectbox("Interview Type", 
                                         ["General", "Technical", "Behavioral", "Case Study"])
+            
+            # Add difficulty level selector
+            difficulty_level = st.selectbox("Difficulty Level", 
+                                          ["Easy", "Medium", "Hard", "Mixed"],
+                                          index=1,
+                                          help="Choose the difficulty level of questions")
         
         job_description = st.text_area("Job Description (Optional)", 
                                       placeholder="Paste the job description here for more targeted questions...",
@@ -122,7 +131,9 @@ class InterviewUI:
                     'target_job_title': job_title,
                     'target_company': company,
                     'experience_level': experience_level,
-                    'interview_type': interview_type
+                    'interview_type': interview_type,
+                    'num_questions': num_questions,
+                    'difficulty_level': difficulty_level
                 })
                 
                 session = self.simulator.start_interview_session(job_description, user_background)
@@ -130,7 +141,7 @@ class InterviewUI:
                 if session and session.get('questions'):
                     st.session_state.interview_session = session
                     st.session_state.interview_active = True
-                    st.success("✅ Interview session created! Starting now...")
+                    st.success(f"✅ Interview session created with {num_questions} questions! Starting now...")
                     st.rerun()
                 else:
                     st.error("❌ Failed to create interview session. Please try again.")

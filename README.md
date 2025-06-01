@@ -1,4 +1,5 @@
 🚀**ResuMate** – Your AI-powered resume and career companion
+---
 
 An open source LLM powered career assistant web application that transforms your career with intelligent tools for:
 

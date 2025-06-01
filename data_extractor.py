@@ -174,9 +174,12 @@ def _extract_education_section(text: str) -> str:
     return "Not found"
 
 def _extract_projects_enhanced(text: str) -> List[Dict]:
-    """Enhanced project extraction with better section detection and duplicate prevention"""
+    """Enhanced project extraction with better format recognition"""
+    import re
+    
     project_headings = [
-        'projects', 'personal projects', 'academic projects', 'side projects',
+        'projects', 'personal projects', 'key projects', 'major projects',
+        'professional projects', 'academic projects', 'side projects',
         'portfolio', 'work samples', 'capstone', 'thesis', 'research',
         'open source', 'github', 'repositories'
     ]
@@ -185,15 +188,18 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
     projects = []
     in_project_section = False
     current_project = None
-    project_buffer = []  # Buffer to collect project-related lines
     
     for i, line in enumerate(lines):
         line_stripped = line.strip()
         line_lower = line_stripped.lower()
         
+        # Skip empty lines
+        if not line_stripped:
+            continue
+        
         # Check if this line is a project section heading
         if any(heading in line_lower for heading in project_headings):
-            if len(line_stripped) < 50 and not any(char.isdigit() for char in line_stripped):  # Likely a heading
+            if len(line_stripped) < 50 and not any(char.isdigit() for char in line_stripped):
                 in_project_section = True
                 # Save any pending project
                 if current_project and current_project.get('title'):
@@ -204,7 +210,7 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
         # Check if we've moved to a different section
         other_sections = ['experience', 'work history', 'employment', 'skills', 'education', 'summary', 'contact']
         if in_project_section and any(section in line_lower for section in other_sections):
-            if len(line_stripped) < 50 and ':' not in line_stripped:  # Likely a new section heading
+            if len(line_stripped) < 50 and ':' not in line_stripped:
                 if current_project and current_project.get('title'):
                     projects.append(current_project)
                 in_project_section = False
@@ -212,141 +218,136 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
         
         # If we're in project section, parse projects
         if in_project_section and line_stripped:
-            # Improved project title detection
-            is_project_title = (
-                # Bullet points with substantial content
-                (line_stripped.startswith(('•', '-', '*', '◦')) and len(line_stripped) > 15) or
-                # Numbered lists
-                re.match(r'^\d+\.?\s+[A-Z][a-zA-Z\s]{5,}', line_stripped) or
-                # Bold/emphasized text (common in resumes)
-                (line_stripped.isupper() and 10 < len(line_stripped) < 60) or
-                # Lines that look like titles (short, starts with capital, no common description words)
-                (15 < len(line_stripped) < 60 and 
-                 line_stripped[0].isupper() and
-                 not line_stripped.startswith(('technologies', 'duration', 'tools', 'skills', 'using', 'developed', 'built', 'created')) and
-                 not line_stripped.endswith((',', '.', ':')) and
-                 not any(word in line_lower for word in ['implemented', 'designed', 'worked', 'responsible']))
-            )
             
-            # Start new project if it's clearly a title
-            if is_project_title:
-                # Save previous project if exists and has meaningful content
-                if current_project and current_project.get('title') and len(current_project['title']) > 5:
+            # Format 1: Pipe-delimited format (Title | Tech | Duration)
+            if '|' in line_stripped and not line_stripped.startswith(('•', '-', '*')):
+                if current_project and current_project.get('title'):
                     projects.append(current_project)
                 
-                # Clean the title
-                title = line_stripped.lstrip('•-*◦0123456789. ').strip()
+                parts = [part.strip() for part in line_stripped.split('|')]
+                if len(parts) >= 2:
+                    current_project = {
+                        "title": parts[0],
+                        "technologies": parts[1] if len(parts) > 1 else "Not specified",
+                        "duration": parts[2] if len(parts) > 2 else "Not specified",
+                        "description": ""
+                    }
+                continue
+            
+            # Format 2: Numbered list format (1. Project Name)
+            numbered_match = re.match(r'^(\d+)\.?\s+(.+)', line_stripped)
+            if numbered_match and len(numbered_match.group(2)) > 5:
+                if current_project and current_project.get('title'):
+                    projects.append(current_project)
+                
+                current_project = {
+                    "title": numbered_match.group(2),
+                    "technologies": "Not specified",
+                    "duration": "Not specified", 
+                    "description": ""
+                }
+                continue
+            
+            # Format 3: Project Name: followed by details
+            if line_stripped.startswith(('Project Name:', 'Project:')):
+                if current_project and current_project.get('title'):
+                    projects.append(current_project)
+                
+                title = line_stripped.replace('Project Name:', '').replace('Project:', '').strip()
                 current_project = {
                     "title": title,
-                    "description": "",
                     "technologies": "Not specified",
-                    "duration": "Not specified"
+                    "duration": "Not specified",
+                    "description": ""
                 }
-                project_buffer = [line_stripped]
+                continue
             
-            # Add content to current project
-            elif current_project:
-                project_buffer.append(line_stripped)
-                
-                # Build description from action-oriented lines
-                if any(word in line_lower for word in ['developed', 'built', 'created', 'implemented', 'designed', 'worked on', 'responsible for']):
-                    if not current_project['description']:
-                        current_project['description'] = line_stripped
-                    else:
-                        current_project['description'] += " " + line_stripped
-                
-                # Extract technologies - look for tech-related keywords
-                tech_indicators = ['technologies', 'tech stack', 'using', 'built with', 'tools', 'languages', 'frameworks']
-                if any(indicator in line_lower for indicator in tech_indicators):
-                    tech_line = line_stripped
-                    # Clean up the technologies line
-                    for prefix in ['technologies:', 'tech stack:', 'using:', 'built with:', 'tools:', 'languages:', 'frameworks:']:
-                        if prefix in tech_line.lower():
-                            tech_line = tech_line.lower().replace(prefix, '').strip()
-                            break
-                    
-                    if tech_line and len(tech_line) > 3 and current_project['technologies'] == "Not specified":
-                        current_project['technologies'] = tech_line.title()
-                  # Extract duration with better patterns
-                duration_patterns = [
-                    r'(\d+\s*(?:months?|weeks?|years?))',
-                    r'(\d{4}\s*-\s*\d{4})',
-                    r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\s*-\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}',
-                    r'(\d{1,2}/\d{4}\s*-\s*\d{1,2}/\d{4})'
-                ]
-                for pattern in duration_patterns:
-                    duration_match = re.search(pattern, line_stripped, re.IGNORECASE)
-                    if duration_match and current_project['duration'] == "Not specified":
-                        current_project['duration'] = duration_match.group(1)
-                        break
-        
-        # Check for projects outside dedicated sections (more conservative)
-        elif not in_project_section:
-            # Only treat as project if it starts with clear project indicators
-            project_starters = ['project:', 'key project:', 'major project:']
-            if any(starter in line_lower for starter in project_starters) and len(line_stripped) > 20:
-                title = line_stripped
-                for starter in project_starters:
-                    if starter in title.lower():
-                        title = title.lower().replace(starter, '').strip()
-                        break
+            # Format 4: All caps or emphasized title lines
+            if (line_stripped.isupper() or 
+                (15 < len(line_stripped) < 80 and 
+                 line_stripped[0].isupper() and 
+                 not line_stripped.startswith(('•', '-', '*')) and
+                 not any(word in line_lower for word in ['technologies', 'duration', 'tech', 'stack', 'using', 'built', 'description']))):
                 
                 if current_project and current_project.get('title'):
                     projects.append(current_project)
                 
                 current_project = {
-                    "title": title[:50] + "..." if len(title) > 50 else title,
-                    "description": "Project details available upon request",
-                    "technologies": "Not specified", 
-                    "duration": "Not specified"
+                    "title": line_stripped,
+                    "technologies": "Not specified",
+                    "duration": "Not specified",
+                    "description": ""
                 }
+                continue
+            
+            # Extract additional details for current project
+            if current_project:
+                # Extract technologies
+                tech_patterns = [
+                    r'(?:technologies?|tech stack|tech|stack|tools|languages|frameworks?):\s*(.+)',
+                    r'(?:using|built with|made with):\s*(.+)',
+                    r'(?:technologies used|tech used):\s*(.+)'
+                ]
+                
+                for pattern in tech_patterns:
+                    tech_match = re.search(pattern, line_stripped, re.IGNORECASE)
+                    if tech_match and current_project['technologies'] == "Not specified":
+                        current_project['technologies'] = tech_match.group(1).strip()
+                        continue
+                
+                # Extract duration/timeline
+                duration_patterns = [
+                    r'(?:duration|timeline|time|period):\s*(.+)',
+                    r'(\d+\s*(?:months?|weeks?|years?))',
+                    r'(\d{4}\s*-\s*\d{4})',
+                    r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\s*-\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}',
+                    r'(\d{1,2}/\d{4}\s*-\s*\d{1,2}/\d{4})',
+                    r'\(([^)]+(?:months?|years?)[^)]*)\)'
+                ]
+                
+                for pattern in duration_patterns:
+                    duration_match = re.search(pattern, line_stripped, re.IGNORECASE)
+                    if duration_match and current_project['duration'] == "Not specified":
+                        current_project['duration'] = duration_match.group(1).strip()
+                        break
+                
+                # Extract description from bullet points or descriptive text
+                if (line_stripped.startswith(('•', '-', '*', '◦')) or 
+                    any(word in line_lower for word in ['developed', 'built', 'created', 'implemented', 'designed', 'achieved', 'features'])):
+                    
+                    desc_text = line_stripped.lstrip('•-*◦ ').strip()
+                    if current_project['description']:
+                        current_project['description'] += " " + desc_text
+                    else:
+                        current_project['description'] = desc_text
     
     # Add the last project if it exists
-    if current_project and current_project.get('title') and len(current_project['title']) > 5:
+    if current_project and current_project.get('title'):
         projects.append(current_project)
     
-    # Enhanced cleaning and deduplication
+    # Clean and validate projects
     cleaned_projects = []
     seen_titles = set()
     
     for project in projects:
-        if not project.get('title'):
+        if not project.get('title') or len(project['title']) < 3:
             continue
-            
+        
         title_lower = project['title'].lower().strip()
         
-        # Skip very short, generic, or duplicate titles
-        if (len(project['title']) < 5 or 
-            title_lower in seen_titles or
-            title_lower in ['project', 'projects', 'work', 'experience']):
-            continue
-        
-        # Skip if title contains only common words
-        common_words = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an']
-        title_words = title_lower.split()
-        if len(title_words) > 0 and all(word in common_words for word in title_words):
-            continue
-        
-        # Skip titles that are clearly not projects
-        skip_patterns = ['technologies:', 'skills:', 'duration:', 'responsible for', 'worked on']
-        if any(pattern in title_lower for pattern in skip_patterns):
+        # Skip duplicates and generic titles
+        if title_lower in seen_titles or title_lower in ['project', 'projects', 'work']:
             continue
         
         seen_titles.add(title_lower)
         
-        # Ensure all fields have proper values
-        if not project.get('description') or project['description'].strip() == "":
+        # Ensure minimum description
+        if not project.get('description') or len(project['description'].strip()) < 10:
             project['description'] = "Project details available upon request"
-        
-        if not project.get('technologies') or project['technologies'] == "":
-            project['technologies'] = "Not specified"
-            
-        if not project.get('duration') or project['duration'] == "":
-            project['duration'] = "Not specified"
         
         cleaned_projects.append(project)
     
-    return cleaned_projects[:5]  # Limit to 5 most relevant projects
+    return cleaned_projects[:5]
 
 class JobSearcher:
     def __init__(self):
