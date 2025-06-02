@@ -1188,10 +1188,8 @@ class GroqLLM:
         return parsed_data
     
     def generate_enhanced_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        # Check if user wants AI-generated projects
         include_projects = user_data.get('include_projects', False)
         
-        # Create the prompt based on whether projects should be generated
         if include_projects:
             projects_instruction = '''
             "projects": [
@@ -1266,17 +1264,14 @@ class GroqLLM:
                     if not isinstance(portfolio_data, dict):
                         raise ValueError("Portfolio data is not a dictionary")
                     
-                    # Use actual user data when available, only enhance if missing
                     portfolio_data.setdefault('headline', f"{user_data.get('title', 'Professional')} | Technology Expert")
                     portfolio_data.setdefault('about', user_data.get('summary', 'Experienced professional with a passion for innovation'))
                     portfolio_data.setdefault('skills', user_data.get('skills', []))
                     
-                    # Handle projects based on include_projects setting
                     if not user_data.get('include_projects', False):
                         portfolio_data['projects'] = []
                     else:
                         portfolio_data.setdefault('projects', [])
-                      # Use actual user experience data if available
                     if user_data.get('work_experience'):
                         portfolio_data['experience'] = user_data['work_experience']
                     elif user_data.get('experience'):
@@ -1307,7 +1302,6 @@ class GroqLLM:
             return self._create_fallback_portfolio(user_data)
     
     def _create_fallback_portfolio(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        # Create projects only if include_projects is True
         projects = []
         if user_data.get('include_projects', False):
             projects = [
@@ -1318,7 +1312,6 @@ class GroqLLM:
                 }
             ]
         
-        # Use actual user experience if available
         experience = []
         if user_data.get('work_experience'):
             experience = user_data['work_experience']
@@ -1346,164 +1339,3 @@ class GroqLLM:
             "education": user_data.get('education', 'Educational background in relevant field'),
             "certifications": user_data.get('certifications', ['Professional Certifications'])
         }
-
-    # def generate_deployment_guide(self, hosting_option: str, user_data: Dict[str, Any]) -> str:
-    #     prompt = f"""
-    #     Create a detailed deployment guide for hosting a portfolio website on {hosting_option}.
-        
-    #     The portfolio is for: {user_data.get('name', 'the user')}
-    #     Portfolio type: Professional portfolio website
-        
-    #     Please provide:
-    #     1. Step-by-step deployment instructions
-    #     2. Prerequisites and requirements
-    #     3. Configuration steps
-    #     4. Best practices for {hosting_option}
-    #     5. Common troubleshooting tips
-    #     6. Cost considerations (if any)
-    #     7. Domain setup (if applicable)
-    #     8. SSL certificate setup
-    #     9. Performance optimization tips
-        
-    #     Make the guide beginner-friendly but comprehensive.
-    #     Include specific commands, code snippets, and configuration examples where relevant.
-    #     """
-        
-    #     messages = [
-    #         {"role": "system", "content": f"You are an expert in web deployment and hosting, specifically knowledgeable about {hosting_option} deployment strategies."},
-    #         {"role": "user", "content": prompt}
-    #     ]
-        
-    #     try:
-    #         return self._make_request(messages, max_tokens=2000, temperature=0.7)
-    #     except Exception as e:
-    #         return f"Error generating deployment guide: {str(e)}"
-
-    # def get_deployment_quick_start(self, hosting_option: str) -> str:
-    #     quick_starts = {
-    #         "Netlify": """
-    #         🚀 **Netlify Quick Start**
-            
-    #         1. **Connect Repository**
-    #             - Link your GitHub/GitLab repository
-    #             - Authorize Netlify access
-            
-    #         2. **Configure Build Settings**
-    #             - Build command: `npm run build` or `yarn build`
-    #             - Publish directory: `dist` or `build`
-            
-    #         3. **Deploy**
-    #             - Click "Deploy Site"
-    #             - Get your live URL instantly
-            
-    #         4. **Custom Domain (Optional)**
-    #             - Go to Domain settings
-    #             - Add your custom domain
-    #             - Configure DNS
-            
-    #         **Pro Tips:**
-    #         - Enable branch deploys for testing
-    #         - Set up form handling for contact forms
-    #         - Use Netlify Functions for serverless features
-    #         """,
-            
-    #         "Vercel": """
-    #         🚀 **Vercel Quick Start**
-            
-    #         1. **Import Project**
-    #             - Connect your Git repository
-    #             - Select framework preset (React, Next.js, etc.)
-            
-    #         2. **Configure Project**
-    #             - Build command: `npm run build`
-    #             - Output directory: `out` or `dist`
-            
-    #         3. **Deploy**
-    #             - Click "Deploy"
-    #             - Get your production URL
-            
-    #         4. **Custom Domain**
-    #             - Add domain in project settings
-    #             - Configure nameservers
-            
-    #         **Pro Tips:**
-    #         - Use Vercel Analytics for insights
-    #         - Enable preview deployments
-    #         - Set up environment variables for APIs
-    #         """,
-            
-    #         "GitHub Pages": """
-    #         🚀 **GitHub Pages Quick Start**
-            
-    #         1. **Repository Setup**
-    #             - Create public repository
-    #             - Upload your portfolio files
-            
-    #         2. **Enable GitHub Pages**
-    #             - Go to Settings > Pages
-    #             - Select source branch (main/gh-pages)
-            
-    #         3. **Configure**
-    #             - Choose root folder or `/docs`
-    #             - Wait for deployment
-            
-    #         4. **Access Your Site**
-    #             - URL: `username.github.io/repository-name`
-            
-    #         **Pro Tips:**
-    #         - Use GitHub Actions for automated builds
-    #         - Add CNAME file for custom domains
-    #         - Keep repository public for free hosting
-    #         """,
-            
-    #         "Firebase": """
-    #         🚀 **Firebase Hosting Quick Start**
-            
-    #         1. **Setup Firebase CLI**
-    #             ```bash
-    #             npm install -g firebase-tools
-    #             firebase login
-    #             ```
-            
-    #         2. **Initialize Project**
-    #             ```bash
-    #             firebase init hosting
-    #             ```
-            
-    #         3. **Deploy**
-    #             ```bash
-    #             firebase deploy
-    #             ```
-            
-    #         4. **Custom Domain**
-    #             - Add domain in Firebase Console
-    #             - Update DNS records
-            
-    #         **Pro Tips:**
-    #         - Use Firebase Analytics
-    #         - Enable caching rules
-    #         - Set up multiple environments
-    #         """
-    #     }
-        
-    #     return quick_starts.get(hosting_option, f"""
-    #     🚀 **{hosting_option} Quick Start**
-        
-    #     1. **Prepare Your Files**
-    #         - Ensure all HTML, CSS, JS files are ready
-    #         - Test locally before deployment
-        
-    #     2. **Upload to {hosting_option}**
-    #         - Follow the platform's upload process
-    #         - Configure any necessary settings
-        
-    #     3. **Configure Domain**
-    #         - Set up custom domain if needed
-    #         - Configure SSL certificate
-        
-    #     4. **Test & Optimize**
-    #         - Check all links and functionality
-    #         - Optimize for performance
-        
-    #     For detailed instructions, refer to {hosting_option}'s official documentation.
-    #     """)

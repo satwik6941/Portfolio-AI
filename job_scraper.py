@@ -1,4 +1,5 @@
 import requests
+import requests
 from bs4 import BeautifulSoup
 import json
 import time
@@ -18,9 +19,7 @@ class JobScraper:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
-        self.rate_limit_delay = 1  # Seconds between requests
-        
-        # Initialize AI data service for enhanced fallback methods
+        self.rate_limit_delay = 1  
         self.ai_data_service = None
         try:
             import os
@@ -38,9 +37,7 @@ class JobScraper:
             self.ai_data_service = None
         
     def _make_request(self, url: str, params: Dict = None) -> Optional[BeautifulSoup]:
-        """Make a rate-limited request to avoid being blocked"""
         try:
-            # Add random delay to avoid being blocked
             time.sleep(self.rate_limit_delay + random.uniform(0.5, 1.5))
             
             response = self.session.get(url, params=params, timeout=10)
@@ -53,16 +50,14 @@ class JobScraper:
             return None
     
     def search_indeed_jobs(self, keywords: str, location: str = "", limit: int = 20) -> List[Dict]:
-        """Scrape jobs from Indeed.com"""
         jobs = []
         
         try:
-            # Build Indeed search URL
             base_url = "https://www.indeed.com/jobs"
             params = {
                 'q': keywords,
                 'l': location,
-                'sort': 'date',  # Sort by date to get latest postings
+                'sort': 'date', 
                 'limit': min(limit, 50)
             }
             
@@ -70,7 +65,6 @@ class JobScraper:
             if not soup:
                 return self._fallback_indeed_jobs(keywords, location, limit)
             
-            # Parse job results
             job_cards = soup.find_all('div', class_='job_seen_beacon') or soup.find_all('a', {'data-jk': True})
             
             for i, card in enumerate(job_cards[:limit]):
@@ -89,9 +83,7 @@ class JobScraper:
         return jobs[:limit]
     
     def _parse_indeed_job(self, card, keywords: str, location: str) -> Optional[Dict]:
-        """Parse individual Indeed job card"""
         try:
-            # Extract job details from HTML structure
             title_elem = card.find('span', {'title': True}) or card.find('h2', class_='jobTitle')
             title = title_elem.get('title', '') if title_elem else keywords + ' Developer'
             
@@ -101,19 +93,15 @@ class JobScraper:
             location_elem = card.find('div', {'data-testid': 'job-location'}) or card.find('div', class_='companyLocation')
             job_location = location_elem.get_text(strip=True) if location_elem else location or 'Remote'
             
-            # Extract job link
             link_elem = card.find('a', href=True)
             job_url = f"https://www.indeed.com{link_elem['href']}" if link_elem and link_elem['href'].startswith('/') else '#'
             
-            # Extract salary if available
             salary_elem = card.find('span', class_='salary-snippet') or card.find('span', {'data-testid': 'attribute_snippet_testid'})
             salary = salary_elem.get_text(strip=True) if salary_elem else 'Competitive salary'
             
-            # Extract job snippet/description
             snippet_elem = card.find('div', class_='job-snippet') or card.find('ul', class_='jobsearch-jobDescriptionText')
             description = snippet_elem.get_text(strip=True) if snippet_elem else f'Exciting {keywords} opportunity with growth potential.'
             
-            # Extract posting date
             date_elem = card.find('span', class_='date') or card.find('span', {'data-testid': 'myJobsStateDate'})
             posted_date = self._parse_posting_date(date_elem.get_text(strip=True) if date_elem else 'Recently')
             
@@ -139,12 +127,9 @@ class JobScraper:
             return None
     
     def search_linkedin_jobs(self, keywords: str, location: str = "", limit: int = 20) -> List[Dict]:
-        """Scrape jobs from LinkedIn (simplified approach)"""
         jobs = []
         
         try:
-            # LinkedIn requires more sophisticated scraping due to JS rendering
-            # Using a simplified approach with fallback data enhanced with realistic patterns
             jobs = self._fallback_linkedin_jobs(keywords, location, limit)
             
         except Exception as e:
@@ -154,18 +139,16 @@ class JobScraper:
         return jobs[:limit]
     
     def search_glassdoor_jobs(self, keywords: str, location: str = "", limit: int = 20) -> List[Dict]:
-        """Scrape jobs from Glassdoor"""
         jobs = []
         
         try:
-            # Build Glassdoor search URL
             search_url = f"https://www.glassdoor.com/Job/jobs.htm"
             params = {
                 'sc.keyword': keywords,
                 'locT': 'C',
-                'locId': '1147401',  # Default to San Francisco
+                'locId': '1147401',  
                 'jobType': 'all',
-                'fromAge': 1,  # Jobs from last day
+                'fromAge': 1,  
                 'minSalary': 0,
                 'includeNoSalaryJobs': 'true',
                 'radius': 25
@@ -178,7 +161,6 @@ class JobScraper:
             if not soup:
                 return self._fallback_glassdoor_jobs(keywords, location, limit)
             
-            # Parse Glassdoor job results
             job_cards = soup.find_all('li', class_='react-job-listing') or soup.find_all('article', class_='jobContainer')
             
             for i, card in enumerate(job_cards[:limit]):
@@ -197,7 +179,6 @@ class JobScraper:
         return jobs[:limit]
     
     def _parse_glassdoor_job(self, card, keywords: str, location: str) -> Optional[Dict]:
-        """Parse individual Glassdoor job card"""
         try:
             title_elem = card.find('a', class_='jobTitle') or card.find('a', {'data-test': 'job-title'})
             title = title_elem.get_text(strip=True) if title_elem else f'{keywords} Specialist'
@@ -208,11 +189,9 @@ class JobScraper:
             location_elem = card.find('span', class_='loc') or card.find('div', class_='jobLocation')
             job_location = location_elem.get_text(strip=True) if location_elem else location or 'Multiple Locations'
             
-            # Extract salary if available
             salary_elem = card.find('span', class_='salaryText') or card.find('div', class_='jobSalary')
             salary = salary_elem.get_text(strip=True) if salary_elem else 'Competitive package'
             
-            # Get job URL
             link_elem = title_elem if title_elem else card.find('a', href=True)
             job_url = link_elem['href'] if link_elem and link_elem.get('href') else '#'
             if job_url.startswith('/'):
@@ -240,13 +219,10 @@ class JobScraper:
             return None
     
     def aggregate_job_search(self, keywords: str, location: str = "", limit: int = 20) -> List[Dict]:
-        """Aggregate jobs from multiple sources"""
         all_jobs = []
         
-        # Distribute limit across sources
         per_source_limit = max(1, limit // 3)
         
-        # Search Indeed
         try:
             indeed_jobs = self.search_indeed_jobs(keywords, location, per_source_limit)
             all_jobs.extend(indeed_jobs)
@@ -254,7 +230,6 @@ class JobScraper:
         except Exception as e:
             logger.error(f"Indeed search failed: {str(e)}")
         
-        # Search LinkedIn (fallback-based)
         try:
             linkedin_jobs = self.search_linkedin_jobs(keywords, location, per_source_limit)
             all_jobs.extend(linkedin_jobs)
@@ -262,7 +237,6 @@ class JobScraper:
         except Exception as e:
             logger.error(f"LinkedIn search failed: {str(e)}")
         
-        # Search Glassdoor
         try:
             glassdoor_jobs = self.search_glassdoor_jobs(keywords, location, per_source_limit)
             all_jobs.extend(glassdoor_jobs)
@@ -270,7 +244,6 @@ class JobScraper:
         except Exception as e:
             logger.error(f"Glassdoor search failed: {str(e)}")
         
-        # Remove duplicates based on title and company
         unique_jobs = []
         seen_jobs = set()
         
@@ -280,13 +253,11 @@ class JobScraper:
                 seen_jobs.add(job_key)
                 unique_jobs.append(job)
         
-        # Sort by posting date (most recent first)
         unique_jobs.sort(key=lambda x: self._parse_date_for_sorting(x.get('posted_date', '')), reverse=True)
         
         return unique_jobs[:limit]
     
     def _parse_posting_date(self, date_text: str) -> str:
-        """Parse posting date from various formats"""
         date_text = date_text.lower().strip()
         
         try:
@@ -312,7 +283,6 @@ class JobScraper:
         return 'Recently'
     
     def _parse_date_for_sorting(self, date_text: str) -> datetime:
-        """Convert date text to datetime for sorting"""
         try:
             if 'today' in date_text.lower():
                 return datetime.now()
@@ -327,10 +297,9 @@ class JobScraper:
         except:
             pass
         
-        return datetime.now() - timedelta(days=7)  # Default to 1 week ago
+        return datetime.now() - timedelta(days=7) 
     
     def _detect_employment_type(self, title: str, description: str) -> str:
-        """Detect employment type from job title and description"""
         text = f"{title} {description}".lower()
         
         if any(word in text for word in ['intern', 'internship', 'co-op', 'co op']):
@@ -343,7 +312,6 @@ class JobScraper:
             return 'Full-time'
     
     def _detect_remote_work(self, description: str, location: str) -> Optional[str]:
-        """Detect if job supports remote work"""
         text = f"{description} {location}".lower()
         
         remote_keywords = ['remote', 'work from home', 'telecommute', 'distributed', 'anywhere']
@@ -354,7 +322,6 @@ class JobScraper:
         return None
     
     def _extract_skills_from_text(self, text: str) -> List[str]:
-        """Extract technical skills from job description"""
         skills_keywords = [
             'Python', 'JavaScript', 'Java', 'React', 'Node.js', 'SQL', 'AWS',
             'Docker', 'Kubernetes', 'Git', 'Agile', 'Scrum', 'REST API',
@@ -371,10 +338,9 @@ class JobScraper:
             if skill.lower() in text_lower:
                 found_skills.append(skill)
         
-        return found_skills[:6]  # Limit to 6 skills
+        return found_skills[:6] 
     
     def _generate_relevant_skills(self, keywords: str) -> List[str]:
-        """Generate relevant skills based on job keywords"""
         skill_mapping = {
             'software': ['Python', 'JavaScript', 'React', 'SQL', 'Git'],
             'data': ['Python', 'SQL', 'Machine Learning', 'Data Analysis', 'Tableau'],
@@ -403,11 +369,8 @@ class JobScraper:
             return 'Yesterday'
         else:
             return f'{days_ago} days ago'
-      # Fallback methods for when scraping fails
     def _fallback_indeed_jobs(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Enhanced fallback Indeed jobs with AI-powered generation"""
         try:
-            # Try AI-powered job generation first
             if self.ai_data_service:
                 logger.info("🤖 Using AI data service for Indeed fallback jobs")
                 ai_jobs = self.ai_data_service.generate_dynamic_jobs(
@@ -416,20 +379,16 @@ class JobScraper:
                     count=limit
                 )
                 if ai_jobs:
-                    # Mark as Indeed source
                     for job in ai_jobs:
                         job['source'] = 'indeed_ai_fallback'
                     return ai_jobs
         except Exception as e:
             logger.warning(f"AI Indeed fallback failed: {e}")
         
-        # Static fallback for complete AI failure
         return self._generate_realistic_jobs('indeed', keywords, location, limit)
     
     def _fallback_linkedin_jobs(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Enhanced fallback LinkedIn jobs with AI-powered generation"""
         try:
-            # Try AI-powered job generation first
             if self.ai_data_service:
                 logger.info("🤖 Using AI data service for LinkedIn fallback jobs")
                 ai_jobs = self.ai_data_service.generate_dynamic_jobs(
@@ -438,20 +397,16 @@ class JobScraper:
                     count=limit
                 )
                 if ai_jobs:
-                    # Mark as LinkedIn source
                     for job in ai_jobs:
                         job['source'] = 'linkedin_ai_fallback'
                     return ai_jobs
         except Exception as e:
             logger.warning(f"AI LinkedIn fallback failed: {e}")
         
-        # Static fallback for complete AI failure
         return self._generate_realistic_jobs('linkedin', keywords, location, limit)
     
     def _fallback_glassdoor_jobs(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Enhanced fallback Glassdoor jobs with AI-powered generation"""
         try:
-            # Try AI-powered job generation first
             if self.ai_data_service:
                 logger.info("🤖 Using AI data service for Glassdoor fallback jobs")
                 ai_jobs = self.ai_data_service.generate_dynamic_jobs(
@@ -467,11 +422,9 @@ class JobScraper:
         except Exception as e:
             logger.warning(f"AI Glassdoor fallback failed: {e}")
         
-        # Static fallback for complete AI failure
         return self._generate_realistic_jobs('glassdoor', keywords, location, limit)
     
     def _generate_realistic_jobs(self, source: str, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Generate realistic job postings when scraping fails"""
         companies = {
             'indeed': ['TechFlow Solutions', 'DataDrive Inc', 'CloudNext Corp', 'InnovateLabs', 'CodeCraft Systems'],
             'linkedin': ['Microsoft', 'Google', 'Amazon', 'Meta', 'Netflix'],
@@ -520,7 +473,6 @@ class JobScraper:
         return jobs
     
     def _generate_salary_range(self, title: str) -> str:
-        """Generate realistic salary range based on job title"""
         title_lower = title.lower()
         
         if 'senior' in title_lower or 'lead' in title_lower:
@@ -530,9 +482,7 @@ class JobScraper:
         else:
             return '$90,000 - $140,000'
 
-# Additional utility functions for job search enhancement
 def get_trending_keywords() -> List[str]:
-    """Get trending job search keywords"""
     return [
         'AI Engineer', 'Machine Learning', 'Cloud Engineer', 'DevOps',
         'Full Stack Developer', 'Data Scientist', 'Cybersecurity',
@@ -540,7 +490,6 @@ def get_trending_keywords() -> List[str]:
     ]
 
 def enhance_job_with_ai_insights(job: Dict) -> Dict:
-    """Enhance job posting with AI-generated insights"""
     job['ai_insights'] = {
         'match_score': random.randint(75, 95),
         'growth_potential': random.choice(['High', 'Medium', 'Very High']),

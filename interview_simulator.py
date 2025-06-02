@@ -18,8 +18,7 @@ class InterviewSimulator:
             'feedback': [],
             'job_description': job_description,
             'user_background': user_background,
-            'start_time': time.time()
-        }
+            'start_time': time.time()        }
         
         return session
     
@@ -33,19 +32,16 @@ class InterviewSimulator:
         if not current_q:
             return None
         
-        # Evaluate the answer using Groq service
         evaluation = self.groq_service.evaluate_interview_answer(
             current_q['question'], 
             answer, 
-            session['job_description']
+            session['user_background']
         )
         
-        # Store the answer and evaluation
         session['answers'].append(answer)
         session['scores'].append(evaluation.get('score', 5))
         session['feedback'].append(evaluation)
         
-        # Move to next question
         session['current_question'] += 1
         
         return evaluation
@@ -64,7 +60,6 @@ class InterviewSimulator:
         avg_score = sum(session['scores']) / len(session['scores'])
         duration_minutes = int((time.time() - session['start_time']) / 60)
         
-        # Determine performance level
         if avg_score >= 8:
             performance_level = "Excellent"
             message = "Outstanding performance! You demonstrated strong knowledge and communication skills."
@@ -100,7 +95,6 @@ class InterviewUI:
         with col1:
             job_title = st.text_input("Job Title", placeholder="e.g., Software Engineer")
             company = st.text_input("Company", placeholder="e.g., Google")
-            # Add number of questions slider
             num_questions = st.slider("Number of Questions", min_value=3, max_value=15, value=5, 
                                     help="Choose how many questions you want to practice with")
         
@@ -111,15 +105,14 @@ class InterviewUI:
             interview_type = st.selectbox("Interview Type", 
                                         ["General", "Technical", "Behavioral", "Case Study"])
             
-            # Add difficulty level selector
             difficulty_level = st.selectbox("Difficulty Level", 
-                                          ["Easy", "Medium", "Hard", "Mixed"],
-                                          index=1,
-                                          help="Choose the difficulty level of questions")
+                                            ["Easy", "Medium", "Hard", "Mixed"],
+                                            index=1,
+                                            help="Choose the difficulty level of questions")
         
         job_description = st.text_area("Job Description (Optional)", 
-                                      placeholder="Paste the job description here for more targeted questions...",
-                                      key="simulator_job_description")
+                                        placeholder="Paste the job description here for more targeted questions...",
+                                        key="simulator_job_description")
         
         if st.button("Start Interview", type="primary"):
             if job_title:

@@ -1,4 +1,5 @@
 import fitz  
+import fitz  
 import docx
 import pytesseract
 from PIL import Image
@@ -66,7 +67,6 @@ class DataExtractor:
             return {'error': f'Could not extract LinkedIn data: {e}'}
 
 def parse_resume_data(text: str) -> Dict:
-        """Enhanced resume parsing with improved education and project extraction"""
         data = {
             'name': '',
             'email': '',
@@ -77,19 +77,16 @@ def parse_resume_data(text: str) -> Dict:
             'projects': []
         }
         
-        # Email extraction
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         emails = re.findall(email_pattern, text)
         if emails:
             data['email'] = emails[0]
         
-        # Phone extraction
         phone_pattern = r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'
         phones = re.findall(phone_pattern, text)
         if phones:
             data['phone'] = ''.join(phones[0]) if isinstance(phones[0], tuple) else phones[0]
 
-        # Name extraction
         lines = text.split('\n')
         for line in lines[:5]:  
             line = line.strip()
@@ -98,7 +95,6 @@ def parse_resume_data(text: str) -> Dict:
                     data['name'] = line
                     break
         
-        # Enhanced skill extraction
         skill_keywords = [
             'Python', 'JavaScript', 'Java', 'C++', 'React', 'Node.js', 'SQL',
             'Machine Learning', 'Data Analysis', 'Project Management', 'Leadership',
@@ -111,16 +107,13 @@ def parse_resume_data(text: str) -> Dict:
             if skill.lower() in text.lower():
                 data['skills'].append(skill)
         
-        # Enhanced education extraction with section detection
         data['education'] = _extract_education_section(text)
         
-        # Enhanced project extraction with section detection
         data['projects'] = _extract_projects_enhanced(text)
         
         return data
 
 def _extract_education_section(text: str) -> str:
-    """Extract education information by looking for education headings and content"""
     education_headings = [
         'education', 'academic background', 'qualifications', 'degrees',
         'university', 'college', 'school', 'certification', 'training'
@@ -134,22 +127,18 @@ def _extract_education_section(text: str) -> str:
     for i, line in enumerate(lines):
         line_lower = line.strip().lower()
         
-        # Check if this line is an education heading
         if any(heading in line_lower for heading in education_headings):
-            if len(line.strip()) < 50:  # Likely a heading, not content
+            if len(line.strip()) < 50:  
                 in_education_section = True
                 section_started = True
                 continue
         
-        # Check if we've moved to a different section
         other_sections = ['experience', 'work', 'employment', 'skills', 'projects', 'summary']
         if in_education_section and any(section in line_lower for section in other_sections):
-            if len(line.strip()) < 50:  # Likely a new section heading
+            if len(line.strip()) < 50: 
                 break
         
-        # If we're in education section, collect content
         if in_education_section and line.strip():
-            # Look for degree indicators
             degree_indicators = ['bachelor', 'master', 'phd', 'diploma', 'certificate', 'degree', 'university', 'college']
             if any(indicator in line_lower for indicator in degree_indicators):
                 education_content.append(line.strip())
@@ -157,9 +146,8 @@ def _extract_education_section(text: str) -> str:
                 education_content.append(line.strip())
     
     if education_content:
-        return ' | '.join(education_content[:3])  # Limit to 3 most relevant entries
+        return ' | '.join(education_content[:3]) 
     
-    # Fallback: look for degree patterns anywhere in text
     degree_patterns = [
         r'(Bachelor|Master|PhD|B\.?[AS]|M\.?[AS]|Ph\.?D\.?).*?(?:in|of).*?(?:\d{4}|\n)',
         r'(University|College).*?(?:\d{4}|\n)',
@@ -174,7 +162,6 @@ def _extract_education_section(text: str) -> str:
     return "Not found"
 
 def _extract_projects_enhanced(text: str) -> List[Dict]:
-    """Enhanced project extraction with better format recognition"""
     import re
     
     project_headings = [
@@ -193,21 +180,17 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
         line_stripped = line.strip()
         line_lower = line_stripped.lower()
         
-        # Skip empty lines
         if not line_stripped:
             continue
         
-        # Check if this line is a project section heading
         if any(heading in line_lower for heading in project_headings):
             if len(line_stripped) < 50 and not any(char.isdigit() for char in line_stripped):
                 in_project_section = True
-                # Save any pending project
                 if current_project and current_project.get('title'):
                     projects.append(current_project)
                     current_project = None
                 continue
         
-        # Check if we've moved to a different section
         other_sections = ['experience', 'work history', 'employment', 'skills', 'education', 'summary', 'contact']
         if in_project_section and any(section in line_lower for section in other_sections):
             if len(line_stripped) < 50 and ':' not in line_stripped:
@@ -216,10 +199,8 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                 in_project_section = False
                 break
         
-        # If we're in project section, parse projects
         if in_project_section and line_stripped:
             
-            # Format 1: Pipe-delimited format (Title | Tech | Duration)
             if '|' in line_stripped and not line_stripped.startswith(('•', '-', '*')):
                 if current_project and current_project.get('title'):
                     projects.append(current_project)
@@ -234,7 +215,6 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                     }
                 continue
             
-            # Format 2: Numbered list format (1. Project Name)
             numbered_match = re.match(r'^(\d+)\.?\s+(.+)', line_stripped)
             if numbered_match and len(numbered_match.group(2)) > 5:
                 if current_project and current_project.get('title'):
@@ -248,7 +228,6 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                 }
                 continue
             
-            # Format 3: Project Name: followed by details
             if line_stripped.startswith(('Project Name:', 'Project:')):
                 if current_project and current_project.get('title'):
                     projects.append(current_project)
@@ -262,12 +241,11 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                 }
                 continue
             
-            # Format 4: All caps or emphasized title lines
             if (line_stripped.isupper() or 
                 (15 < len(line_stripped) < 80 and 
-                 line_stripped[0].isupper() and 
-                 not line_stripped.startswith(('•', '-', '*')) and
-                 not any(word in line_lower for word in ['technologies', 'duration', 'tech', 'stack', 'using', 'built', 'description']))):
+                line_stripped[0].isupper() and 
+                not line_stripped.startswith(('•', '-', '*')) and
+                not any(word in line_lower for word in ['technologies', 'duration', 'tech', 'stack', 'using', 'built', 'description']))):
                 
                 if current_project and current_project.get('title'):
                     projects.append(current_project)
@@ -280,9 +258,7 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                 }
                 continue
             
-            # Extract additional details for current project
             if current_project:
-                # Extract technologies
                 tech_patterns = [
                     r'(?:technologies?|tech stack|tech|stack|tools|languages|frameworks?):\s*(.+)',
                     r'(?:using|built with|made with):\s*(.+)',
@@ -295,7 +271,6 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                         current_project['technologies'] = tech_match.group(1).strip()
                         continue
                 
-                # Extract duration/timeline
                 duration_patterns = [
                     r'(?:duration|timeline|time|period):\s*(.+)',
                     r'(\d+\s*(?:months?|weeks?|years?))',
@@ -311,7 +286,6 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                         current_project['duration'] = duration_match.group(1).strip()
                         break
                 
-                # Extract description from bullet points or descriptive text
                 if (line_stripped.startswith(('•', '-', '*', '◦')) or 
                     any(word in line_lower for word in ['developed', 'built', 'created', 'implemented', 'designed', 'achieved', 'features'])):
                     
@@ -321,11 +295,9 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
                     else:
                         current_project['description'] = desc_text
     
-    # Add the last project if it exists
     if current_project and current_project.get('title'):
         projects.append(current_project)
     
-    # Clean and validate projects
     cleaned_projects = []
     seen_titles = set()
     
@@ -335,13 +307,11 @@ def _extract_projects_enhanced(text: str) -> List[Dict]:
         
         title_lower = project['title'].lower().strip()
         
-        # Skip duplicates and generic titles
         if title_lower in seen_titles or title_lower in ['project', 'projects', 'work']:
             continue
         
         seen_titles.add(title_lower)
         
-        # Ensure minimum description
         if not project.get('description') or len(project['description'].strip()) < 10:
             project['description'] = "Project details available upon request"
         
@@ -353,9 +323,7 @@ class JobSearcher:
     def __init__(self):
         self.job_scraper = None
         self.scraper_available = False
-        self.job_cache = {}  # Cache for performance
-        
-        # Initialize AI data service
+        self.job_cache = {} 
         self.ai_data_service = None
         try:
             import os
@@ -370,11 +338,9 @@ class JobSearcher:
             print(f"⚠️ Could not initialize AI data service: {e}")
             self.ai_data_service = None
         
-        # Initialize the new Beautiful Soup job scraper
         self._initialize_job_scraper()
     
     def _initialize_job_scraper(self):
-        """Initialize Beautiful Soup job scraper"""
         try:
             from job_scraper import JobScraper
             self.job_scraper = JobScraper()
@@ -390,7 +356,6 @@ class JobSearcher:
                     company_size: str = "", remote: bool = False, job_type: str = "Full-time Jobs", limit: int = 20) -> List[Dict]:
         try:
             if self.scraper_available and self.job_scraper:
-                # Use Beautiful Soup job scraper for latest postings
                 print(f"🔍 Searching for latest {keywords} jobs...")
                 
                 jobs = self.job_scraper.aggregate_job_search(
@@ -400,10 +365,8 @@ class JobSearcher:
                 )
                 
                 if jobs:
-                    # Filter by experience level and company size if specified
                     filtered_jobs = self._filter_jobs_by_criteria(jobs, experience_level, company_size, remote)
                     
-                    # Enhance jobs with AI insights
                     for job in filtered_jobs:
                         job = self._enhance_job_with_insights(job, keywords)
                     
@@ -419,26 +382,20 @@ class JobSearcher:
     
     def _filter_jobs_by_criteria(self, jobs: List[Dict], experience_level: str, 
                                 company_size: str, remote: bool) -> List[Dict]:
-        """Filter jobs based on additional criteria"""
         filtered_jobs = []
         
         for job in jobs:
-            # Filter by remote preference
             if remote and not job.get('remote_type'):
                 continue
             
-            # Filter by company size (basic matching)
             if company_size and company_size != job.get('company_size', ''):
-                # Allow some flexibility in company size matching
                 pass
             
-            # Filter by experience level (basic keyword matching in description)
             if experience_level:
                 exp_keywords = self._get_experience_keywords(experience_level)
                 job_text = f"{job.get('description', '')} {job.get('title', '')}".lower()
                 
                 if exp_keywords and not any(keyword in job_text for keyword in exp_keywords):
-                    # Still include job but lower its relevance
                     job['experience_match'] = False
                 else:
                     job['experience_match'] = True
@@ -448,7 +405,6 @@ class JobSearcher:
         return filtered_jobs
     
     def _get_experience_keywords(self, experience_level: str) -> List[str]:
-        """Get keywords associated with experience levels"""
         level_keywords = {
             "Entry Level (0-2 years)": ["entry", "junior", "associate", "new grad", "0-2 years"],
             "Mid Level (3-5 years)": ["mid", "intermediate", "3-5 years", "experienced"],
@@ -459,30 +415,24 @@ class JobSearcher:
         return level_keywords.get(experience_level, [])
     
     def get_job_recommendations(self, user_skills: List[str], location: str = "") -> List[Dict]:
-        """Get personalized job recommendations"""
         try:
             if self.api_available and self.google_jobs_api:
                 return self.google_jobs_api.get_job_recommendations(user_skills, location)
         except Exception as e:
             print(f"Error getting job recommendations: {str(e)}")
-          # Fallback to regular search
         skills_query = " ".join(user_skills[:3]) if user_skills else "software developer"
         return self.search_jobs(skills_query, location, limit=10)
     
     def get_trending_jobs(self, location: str = "") -> List[Dict]:
-        """Get trending job opportunities"""
         try:
             if self.api_available and self.google_jobs_api:
                 return self.google_jobs_api.get_trending_jobs(location)
         except Exception as e:
             print(f"Error getting trending jobs: {str(e)}")
-          # Fallback trending searches
         return self._fallback_trending_search(location)
     
     def _fallback_trending_search(self, location: str) -> List[Dict]:
-        """AI-powered dynamic trending jobs generation"""
         try:
-            # Use AI data service for trending jobs
             trending_jobs = self.ai_data_service.generate_dynamic_jobs(
                 keywords="trending technology roles",
                 location=location,
@@ -492,7 +442,6 @@ class JobSearcher:
             )
             
             if trending_jobs and len(trending_jobs) > 0:
-                # Mark these as trending jobs
                 for job in trending_jobs:
                     job['source'] = 'ai_trending'
                     job['trending'] = True
@@ -508,7 +457,6 @@ class JobSearcher:
             return self._minimal_trending_fallback(location)
     
     def _minimal_trending_fallback(self, location: str) -> List[Dict]:
-        """Minimal trending jobs fallback"""
         return [
             {
                 'title': 'AI/ML Engineer - High Demand',
@@ -526,7 +474,6 @@ class JobSearcher:
         ]
     
     def get_salary_insights(self, job_title: str, location: str = "") -> Dict:
-        """Get salary insights for a job title and location"""
         try:
             if self.api_available and self.google_jobs_api:
                 return self.google_jobs_api.get_salary_insights(job_title, location)
@@ -536,7 +483,6 @@ class JobSearcher:
         return self._fallback_salary_insights(job_title, location)
     
     def _fallback_salary_insights(self, job_title: str, location: str) -> Dict:
-        """Fallback salary insights"""
         base_salaries = {
             'software engineer': 110000,
             'data scientist': 120000,
@@ -552,7 +498,6 @@ class JobSearcher:
                 base_salary = salary
                 break
         
-        # Location adjustments
         location_multipliers = {
             'san francisco': 1.4, 'new york': 1.3, 'seattle': 1.2,
             'boston': 1.15, 'austin': 1.1, 'remote': 1.0
@@ -575,9 +520,7 @@ class JobSearcher:
         }
     
     def _fallback_search(self, keywords: str, location: str, experience_level: str, job_type: str, limit: int) -> List[Dict]:
-        """Enhanced AI-powered fallback job search"""
         try:
-            # Use AI data service for dynamic job generation
             ai_jobs = self.ai_data_service.generate_dynamic_jobs(
                 keywords=keywords,
                 location=location,
@@ -598,7 +541,6 @@ class JobSearcher:
             return self._minimal_hardcoded_fallback(keywords, location, limit)
     
     def _minimal_hardcoded_fallback(self, keywords: str, location: str, limit: int) -> List[Dict]:
-        """Minimal hardcoded fallback when all AI systems fail"""
         companies = ["TechFlow Solutions", "DataDrive Inc", "CloudNext Corp", "InnovateLabs"]
         locations = ["Remote", "San Francisco, CA", "New York, NY", "Seattle, WA"]
         
@@ -651,7 +593,6 @@ class JobSearcher:
         return ['Problem Solving', 'Team Collaboration', 'Communication', 'Leadership']
     
     def _generate_benefits(self) -> List[str]:
-        """Generate realistic job benefits"""
         all_benefits = [
             'Health, dental, and vision insurance',
             'Unlimited PTO',
@@ -688,7 +629,6 @@ class JobSearcher:
         return requirements
     
     def get_job_details(self, job_id: str) -> Optional[Dict]:
-        """Get detailed information about a specific job"""
         try:
             if self.api_available and self.google_jobs_api:
                 return self.google_jobs_api.get_job_details(job_id)
@@ -698,14 +638,11 @@ class JobSearcher:
         return None
     
     def get_company_insights(self, company_name: str) -> Dict:
-        """Get insights about a company"""
         try:
-            # Search for jobs at the company to gather insights
             if self.api_available and self.google_jobs_api:
                 company_jobs = self.google_jobs_api.search_jobs_by_company([company_name])
                 
                 if company_jobs:
-                    # Aggregate insights from job postings
                     total_jobs = len(company_jobs)
                     common_skills = self._extract_common_skills(company_jobs)
                     salary_range = self._estimate_company_salary_range(company_jobs)
@@ -722,7 +659,6 @@ class JobSearcher:
         except Exception as e:
             print(f"Error fetching company insights: {str(e)}")
         
-        # Fallback company insights
         return {
             'name': company_name,
             'industry': 'Technology',
@@ -735,7 +671,6 @@ class JobSearcher:
         }
     
     def _extract_common_skills(self, jobs: List[Dict]) -> List[str]:
-        """Extract most common skills from job listings"""
         skill_counts = {}
         
         for job in jobs:
@@ -743,18 +678,15 @@ class JobSearcher:
             for skill in skills:
                 skill_counts[skill] = skill_counts.get(skill, 0) + 1
         
-        # Return top 10 most common skills
         sorted_skills = sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)
         return [skill for skill, count in sorted_skills[:10]]
     
     def _estimate_company_salary_range(self, jobs: List[Dict]) -> Dict:
-        """Estimate salary range for a company based on job postings"""
         salaries = []
         
         for job in jobs:
             salary_str = job.get('salary', '')
             if salary_str and 'competitive' not in salary_str.lower():
-                # Extract salary numbers
                 salary_numbers = self._extract_salary_numbers_basic(salary_str)
                 salaries.extend(salary_numbers)
         
@@ -768,7 +700,6 @@ class JobSearcher:
         return {'min': 70000, 'max': 150000, 'average': 110000}
     
     def _extract_salary_numbers_basic(self, salary_str: str) -> List[int]:
-        """Basic salary number extraction"""
         import re
         numbers = re.findall(r'\d{4,6}', salary_str)
         
@@ -784,18 +715,14 @@ class JobSearcher:
         return salary_values
     
     def validate_google_jobs_access(self) -> bool:
-        """Validate Google Cloud Talent Solution API access"""
         return self.api_available
     
     def get_salary_insights(self, job_title: str, location: str = "") -> Dict:
         try:
-            # Google Jobs API doesn't provide direct salary insights
-            # Return enhanced fallback data based on market research
             pass
         except Exception as e:
             print(f"Error fetching salary insights: {str(e)}")
             
-        # Enhanced salary data based on current market trends
         base_salaries = {
             'software engineer': {'min': 85000, 'max': 150000, 'median': 115000},
             'data scientist': {'min': 95000, 'max': 170000, 'median': 130000},
@@ -807,7 +734,6 @@ class JobSearcher:
             'backend developer': {'min': 80000, 'max': 150000, 'median': 115000}
         }
         
-        # Location multipliers for salary adjustment
         location_multipliers = {
             'san francisco': 1.4, 'new york': 1.3, 'seattle': 1.2,
             'boston': 1.15, 'austin': 1.05, 'remote': 1.0
@@ -830,7 +756,6 @@ class JobSearcher:
     
     def get_trending_skills(self, industry: str = "") -> List[str]:
         try:
-            # Enhanced trending skills based on current market demands
             skill_trends = {
                 'technology': [
                     'Artificial Intelligence', 'Machine Learning', 'Cloud Computing',
@@ -886,7 +811,6 @@ class JobSearcher:
         return unique_alerts[:10]
     
     def get_trending_skills(self, industry: str = "") -> List[str]:
-        """Get trending skills in the industry"""
         try:
             if self.api_available and self.google_jobs_api:
                 trending_jobs = self.google_jobs_api.get_trending_jobs()
@@ -894,7 +818,6 @@ class JobSearcher:
         except Exception as e:
             print(f"Error getting trending skills: {str(e)}")
         
-        # Fallback trending skills
         default_skills = [
             "Python", "JavaScript", "React", "AWS", "Docker", "Kubernetes",
             "Machine Learning", "Node.js", "TypeScript", "GraphQL",
@@ -904,7 +827,6 @@ class JobSearcher:
         return default_skills[:10]
     
     def get_job_alerts(self, user_profile: Dict, preferences: Dict) -> List[Dict]:
-        """Get personalized job alerts based on user profile and preferences"""
         try:
             skills = user_profile.get('skills', [])
             location = preferences.get('location', '')
@@ -912,7 +834,6 @@ class JobSearcher:
             if self.api_available and self.google_jobs_api:
                 recommended_jobs = self.google_jobs_api.get_job_recommendations(skills, location)
                 
-                # Filter based on preferences
                 filtered_jobs = []
                 for job in recommended_jobs:
                     if self._matches_preferences(job, preferences):
@@ -920,27 +841,23 @@ class JobSearcher:
                         job['match_reason'] = self._get_match_reason(job, user_profile)
                         filtered_jobs.append(job)
                 
-                return filtered_jobs[:5]  # Return top 5 alerts
+                return filtered_jobs[:5] 
         except Exception as e:
             print(f"Error getting job alerts: {str(e)}")
         
         return []
     
     def _matches_preferences(self, job: Dict, preferences: Dict) -> bool:
-        """Check if job matches user preferences"""
-        # Check salary expectations
         expected_salary = preferences.get('salary_min', 0)
         if expected_salary > 0:
             job_salary = self._estimate_job_salary(job.get('salary', ''))
             if job_salary > 0 and job_salary < expected_salary:
                 return False
         
-        # Check remote work preference
         if preferences.get('remote_only', False):
             if not job.get('remote_type'):
                 return False
         
-        # Check employment type
         preferred_types = preferences.get('employment_types', [])
         if preferred_types and job.get('employment_type') not in preferred_types:
             return False
@@ -948,7 +865,6 @@ class JobSearcher:
         return True
     
     def _estimate_job_salary(self, salary_str: str) -> int:
-        """Estimate numeric salary from salary string"""
         if not salary_str or 'competitive' in salary_str.lower():
             return 0
         
@@ -956,7 +872,6 @@ class JobSearcher:
         return max(numbers) if numbers else 0
     
     def _get_match_reason(self, job: Dict, user_profile: Dict) -> str:
-        """Get reason why job matches user profile"""
         user_skills = set(skill.lower() for skill in user_profile.get('skills', []))
         job_skills = set(skill.lower() for skill in job.get('skills', []))
         
@@ -971,28 +886,23 @@ class JobSearcher:
         return "Recommended based on your profile"
     
     def validate_google_jobs_access(self) -> bool:
-        """Validate Google Cloud Talent Solution API access"""
         return self.api_available
     
     def _enhance_job_with_insights(self, job: Dict, keywords: str) -> Dict:
-        """Enhance job posting with AI insights and matching scores"""
         import random
         
-        # Add AI match score based on keywords and job content
         title_match = len(set(keywords.lower().split()) & set(job.get('title', '').lower().split()))
         skills_match = len(set(keywords.lower().split()) & set(' '.join(job.get('skills', [])).lower().split()))
         
         base_score = 70 + (title_match * 5) + (skills_match * 3)
         job['ai_match_score'] = min(98, base_score + random.randint(-5, 10))
         
-        # Add market insights
         job['market_insights'] = {
             'demand_level': random.choice(['High', 'Very High', 'Growing']),
             'salary_competitiveness': random.choice(['Above Average', 'Competitive', 'Excellent']),
             'growth_potential': random.choice(['Strong', 'Excellent', 'High'])
         }
         
-        # Add application tips
         job['application_tips'] = [
             f"Highlight your {keywords} experience",
             "Showcase relevant project portfolio",

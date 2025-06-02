@@ -199,13 +199,13 @@ class PortfolioGenerator:
         }
     </style>
 </head>
-<body>
-    <header>
+<body>    <header>
         <nav class="container">
             <ul>
                 <li><a href="#hero"><i class="fas fa-home"></i> Home</a></li>
                 <li><a href="#about"><i class="fas fa-user"></i> About</a></li>
                 <li><a href="#skills"><i class="fas fa-cogs"></i> Skills</a></li>
+                <li><a href="#projects"><i class="fas fa-code"></i> Projects</a></li>
                 <li><a href="#experience"><i class="fas fa-briefcase"></i> Experience</a></li>
                 <li><a href="#contact"><i class="fas fa-envelope"></i> Contact</a></li>
             </ul>
@@ -227,9 +227,7 @@ class PortfolioGenerator:
                 <p>{{ about }}</p>
             </div>
         </div>
-    </section>
-
-    <section id="skills" class="section">
+    </section>    <section id="skills" class="section">
         <div class="container">
             <h2><i class="fas fa-star"></i> Skills & Expertise</h2>
             <div class="skills-grid">
@@ -241,6 +239,19 @@ class PortfolioGenerator:
                 </div>
                 {% endfor %}
             </div>
+        </div>
+    </section>
+
+    <section id="projects" class="section">
+        <div class="container">
+            <h2><i class="fas fa-code"></i> Featured Projects</h2>
+            {% for project in projects %}
+            <div class="experience-item">
+                <h3>{{ project.title }}</h3>
+                <div class="company">{{ project.technologies }} | {{ project.duration }}</div>
+                <p>{{ project.description }}</p>
+            </div>
+            {% endfor %}
         </div>
     </section>
 
@@ -286,7 +297,6 @@ class PortfolioGenerator:
         return template.render(**portfolio_data)
 
     def save_portfolio(self, html_content: str, filename: str = None) -> str:
-        """Save portfolio HTML file"""
         if not filename:
             filename = f"portfolio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         
@@ -917,13 +927,13 @@ class PortfolioGenerator:
         {style_layout}
     </style>
 </head>
-<body>
-    <header>
+<body>    <header>
         <nav class="container">
             <ul>
                 <li><a href="#hero"><i class="fas fa-home"></i> Home</a></li>
                 <li><a href="#about"><i class="fas fa-user"></i> About</a></li>
                 <li><a href="#skills"><i class="fas fa-cogs"></i> Skills</a></li>
+                <li><a href="#projects"><i class="fas fa-code"></i> Projects</a></li>
                 <li><a href="#experience"><i class="fas fa-briefcase"></i> Experience</a></li>
                 <li><a href="#contact"><i class="fas fa-envelope"></i> Contact</a></li>
             </ul>
@@ -945,9 +955,7 @@ class PortfolioGenerator:
                 <p>{{{{ about }}}}</p>
             </div>
         </div>
-    </section>
-
-    <section id="skills" class="section">
+    </section>    <section id="skills" class="section">
         <div class="container">
             <h2><i class="fas fa-star"></i> Skills & Expertise</h2>
             <div class="skills-grid">
@@ -959,6 +967,19 @@ class PortfolioGenerator:
                 </div>
                 {{% endfor %}}
             </div>
+        </div>
+    </section>
+
+    <section id="projects" class="section">
+        <div class="container">
+            <h2><i class="fas fa-code"></i> Featured Projects</h2>
+            {{% for project in projects %}}
+            <div class="experience-item">
+                <h3>{{{{ project.title }}}}</h3>
+                <div class="company">{{{{ project.technologies }}}} | {{{{ project.duration }}}}</div>
+                <p>{{{{ project.description }}}}</p>
+            </div>
+            {{% endfor %}}
         </div>
     </section>
 
@@ -1052,7 +1073,6 @@ class ResumeGenerator:
         return cleaned_content
     
     def _llm_clean_content(self, content: str, groq_service, content_type: str) -> str:
-        """Use LLM to intelligently clean content by removing AI analysis statements"""
         try:
             prompt = f"""
             Clean this {content_type} content by removing:
@@ -1139,10 +1159,8 @@ ADDITIONAL QUALIFICATIONS
         lines = clean_content.split('\n')
         for line in lines:
             if line.strip():
-                # Clean line of problematic Unicode characters
                 line = line.replace('\u2022', '•').replace('\u2013', '-').replace('\u2014', '--')
                 line = line.replace('\u201c', '"').replace('\u201d', '"').replace('\u2018', "'").replace('\u2019', "'")
-                # Remove any remaining non-ASCII characters that might cause issues
                 line = ''.join(char if ord(char) < 256 else '?' for char in line)
                 
                 if line.isupper() or ':' in line[:20]:
@@ -1198,7 +1216,6 @@ Generated on {datetime.now().strftime('%B %d, %Y')}
         return formatted_resume.strip()
 
     def save_resume(self, content: str, filename: str = None) -> str:
-        """Save resume to text file"""
         if not filename:
             filename = f"resume_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         
@@ -1413,10 +1430,8 @@ I look forward to hearing from you soon."""
         lines = clean_content.split('\n')
         for line in lines:
             if line.strip():
-                # Clean line of problematic Unicode characters
                 line = line.replace('\u2022', '•').replace('\u2013', '-').replace('\u2014', '--')
                 line = line.replace('\u201c', '"').replace('\u201d', '"').replace('\u2018', "'").replace('\u2019', "'")
-                # Remove any remaining non-ASCII characters that might cause issues
                 line = ''.join(char if ord(char) < 256 else '?' for char in line)
                 
                 if len(line) > 80:

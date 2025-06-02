@@ -1242,8 +1242,7 @@ def portfolio_page(groq_service, portfolio_gen):
         
         color_scheme = st.selectbox("Color Scheme:", ["Blue Gradient (Professional)",
             "Purple Gradient (Creative)", 
-            "Green Gradient (Tech)",
-            "Orange Gradient (Energy)",
+            "Green Gradient (Tech)",            "Orange Gradient (Energy)",
             "Dark Theme (Modern)"
         ])
     
@@ -1252,6 +1251,19 @@ def portfolio_page(groq_service, portfolio_gen):
         st.write(f"✅ **Name:** {st.session_state.user_data.get('name', 'N/A')}")
         st.write(f"✅ **Title:** {st.session_state.user_data.get('title', 'N/A')}")
         st.write(f"✅ **Skills:** {len(st.session_state.user_data.get('skills', []))} skills")
+        
+        resume_extracted_projects = len(st.session_state.user_data.get('projects', []))
+        manual_resume_projects = len(st.session_state.get('resume_projects', []))
+        total_projects = resume_extracted_projects + manual_resume_projects
+        
+        if total_projects > 0:
+            st.write(f"🚀 **Projects Available:** {total_projects}")
+            if resume_extracted_projects > 0:
+                st.write(f"  └─ From resume: {resume_extracted_projects}")
+            if manual_resume_projects > 0:
+                st.write(f"  └─ Manual entry: {manual_resume_projects}")
+        else:
+            st.write("🚀 **Projects:** None (AI will generate if enabled)")
     
     if st.button("🚀 Generate AI Portfolio", type="primary", use_container_width=True):
         with st.spinner("🤖 AI is crafting your professional portfolio..."):
@@ -1331,18 +1343,23 @@ def portfolio_page(groq_service, portfolio_gen):
             elif ai_education:
                 template_data['education'] = ai_education
             else:
-                template_data['education'] = 'Educational background'
+                template_data['education'] = 'Educational background'           
             user_projects = st.session_state.user_data.get('projects', [])
+            resume_projects = st.session_state.get('resume_projects', [])
             ai_projects = portfolio_content.get('projects', [])
             
+            all_projects = []
+            
             if user_projects:
-                template_data['projects'] = user_projects
-                if settings.get('include_projects') and ai_projects:
-                    template_data['projects'].extend(ai_projects)
-            elif settings.get('include_projects') and ai_projects:
-                template_data['projects'] = ai_projects
-            else:
-                template_data['projects'] = []
+                all_projects.extend(user_projects)
+            
+            if resume_projects:
+                all_projects.extend(resume_projects)
+            
+            if settings.get('include_projects') and ai_projects:
+                all_projects.extend(ai_projects)
+            
+            template_data['projects'] = all_projects
             st.session_state.portfolio_template_data = template_data
             html_content = portfolio_gen.generate_html(template_data)
             st.session_state.portfolio_html = html_content;
@@ -1350,38 +1367,35 @@ def portfolio_page(groq_service, portfolio_gen):
             st.subheader("🌟 Portfolio Preview")
             st.components.v1.html(html_content, height=600, scrolling=True)
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    label="📥 Download HTML",
-                    data=html_content,
-                    file_name=f"portfolio_{template_data.get('name', 'portfolio').replace(' ', '_').lower()}.html",
-                    mime="text/html",
-                    use_container_width=True
-                )
-            with col2:
-                st.markdown("### 🚀 Deploy Your Portfolio")
-                deployment_option = st.selectbox(
-                    "Choose deployment platform:",
-                    ["Select Platform", "Vercel", "Netlify", "GitHub Pages"],
-                    key="portfolio_deployment_select"
-                )
+            st.download_button(
+                label="📥 Download HTML",
+                data=html_content,
+                file_name=f"portfolio_{template_data.get('name', 'portfolio').replace(' ', '_').lower()}.html",
+                mime="text/html",
+                use_container_width=True
+            )
+            st.markdown("### 🚀 Deploy Your Portfolio")
+            deployment_option = st.selectbox(
+                "Choose deployment platform:",
+                ["Select Platform", "Vercel", "Netlify", "GitHub Pages"],
+                key="portfolio_deployment_select"
+            )
                 
-                if deployment_option != "Select Platform":
-                    deployment_urls = {
-                        "Vercel": "https://vercel.com/new",
-                        "Netlify": "https://app.netlify.com/drop", 
-                        "GitHub Pages": "https://pages.github.com/"
-                    }
+            if deployment_option != "Select Platform":
+                deployment_urls = {
+                    "Vercel": "https://vercel.com/new",
+                    "Netlify": "https://app.netlify.com/drop", 
+                    "GitHub Pages": "https://pages.github.com/"
+                }
                     
-                    if deployment_option in deployment_urls:
-                        st.link_button(
-                            f"🌐 Deploy to {deployment_option}",
-                            deployment_urls[deployment_option],
-                            use_container_width=True
-                        )
-                        st.success(f"🎉 Click the button above to open {deployment_option} deployment page!")
-                        st.info(f"💡 Upload your downloaded HTML file to {deployment_option} to deploy your portfolio.")
+                if deployment_option in deployment_urls:
+                    st.link_button(
+                        f"🌐 Deploy to {deployment_option}",
+                        deployment_urls[deployment_option],
+                        use_container_width=True
+                    )
+                    st.success(f"🎉 Click the button above to open {deployment_option} deployment page!")
+                    st.info(f"💡 Upload your downloaded HTML file to {deployment_option} to deploy your portfolio.")
                 else:
                     st.info("💡 Select a deployment platform to get started!")
         except Exception as e:
@@ -1413,14 +1427,41 @@ def resume_page(groq_service, resume_gen):
         "💼 Enter Your Skills and Experience:",
         height=150,
         placeholder="Enter your technical skills, soft skills, certifications, and key experiences here. Separate with commas or line breaks.\n\nExample:\nPython, JavaScript, React, Node.js\nProject Management, Team Leadership\nAWS, Docker, Kubernetes\n5 years software development experience",
-        help="List all your relevant skills, technologies, certifications, and experience. The AI will use this to generate your resume.",
-        key="resume_skills_input"
+        help="List all your relevant skills, technologies, certifications, and experience. The AI will use this to generate your resume.",        key="resume_skills_input"
     )
     
     st.markdown("### 🚀 Project Management")
     st.info("Add your projects to enhance your resume. AI will format them using the STAR method (Situation, Task, Action, Result).")
     if 'resume_projects' not in st.session_state:
         st.session_state.resume_projects = []
+    
+    extracted_projects = st.session_state.user_data.get('projects', [])
+    if extracted_projects:
+        import_resume_projects = st.checkbox(
+            f"📥 Import projects from resume ({len(extracted_projects)} projects available)",
+            value=False,
+            help="Automatically add projects that were extracted from your uploaded resume"
+        )
+        
+        if import_resume_projects:
+            for extracted_project in extracted_projects:
+                project_exists = any(
+                    proj.get('title', '').lower() == extracted_project.get('title', '').lower() 
+                    for proj in st.session_state.resume_projects
+                )
+                if not project_exists:
+                    resume_project = {
+                        'title': extracted_project.get('title', 'Untitled Project'),
+                        'description': extracted_project.get('description', 'No description available'),
+                        'technologies': extracted_project.get('technologies', ''),
+                        'duration': extracted_project.get('duration', 'Not specified'),
+                        'still_working': False
+                    }
+                    st.session_state.resume_projects.append(resume_project)
+            
+            if st.session_state.resume_projects:
+                st.success(f"✅ Imported {len([p for p in st.session_state.resume_projects if any(ep.get('title', '').lower() == p.get('title', '').lower() for ep in extracted_projects)])} projects from your resume!")
+                st.rerun()
     
     with st.expander("➕ Add New Project", expanded=False):
         with st.form("project_form"):
@@ -1541,11 +1582,9 @@ def resume_page(groq_service, resume_gen):
                     'user_skills': user_skills,
                     'job_description': job_description,
                     'resume_style': resume_style,
-                    'enhanced_data': enhanced_data,
-                    'projects': st.session_state.resume_projects
+                    'enhanced_data': enhanced_data,                    'projects': st.session_state.resume_projects
                 }
                 st.success("✅ AI Resume generated successfully!")
-    
     if st.session_state.resume_content:
         resume_content = st.session_state.resume_content
         generated_data = st.session_state.resume_generated_data
@@ -1553,12 +1592,12 @@ def resume_page(groq_service, resume_gen):
         st.subheader("📋 Resume Content")
         st.markdown(resume_content)
         
-        pdf_bytes = resume_gen.generate_pdf(resume_content, st.session_state.user_data)
+        formatted_resume = resume_gen.format_resume_text(resume_content, st.session_state.user_data)
         st.download_button(
-            label="📥 Save PDF",
-            data=pdf_bytes,
-            file_name=f"resume_{st.session_state.user_data.get('name', 'resume').replace(' ', '_').lower()}.pdf",
-            mime="application/pdf",
+            label="📥 Save Text",
+            data=formatted_resume,
+            file_name=f"resume_{st.session_state.user_data.get('name', 'resume').replace(' ', '_').lower()}.txt",
+            mime="text/plain",
             use_container_width=True
         )
         
@@ -1762,22 +1801,21 @@ def cover_letter_page(groq_service, cover_letter_gen):
         
         st.subheader("📝 Generated Cover Letter")
         st.markdown(cover_letter_content)
-        
         col1, col2 = st.columns(2)
         with col1:
             clean_content = cover_letter_gen._clean_cover_letter_content(cover_letter_content)
             try:
-                pdf_bytes = cover_letter_gen.generate_pdf(clean_content, st.session_state.user_data, cover_letter_data.get('company_name', 'Company'))
+                formatted_cover_letter = cover_letter_gen.format_cover_letter_text(clean_content, st.session_state.user_data, cover_letter_data)
                 st.download_button(
-                    label="📥 Save PDF",
-                    data=pdf_bytes,
-                    file_name=f"cover_letter_{cover_letter_data.get('company_name', 'company').replace(' ', '_').lower()}.pdf",
-                    mime="application/pdf",
+                    label="📥 Save Text",
+                    data=formatted_cover_letter,
+                    file_name=f"cover_letter_{cover_letter_data.get('company_name', 'company').replace(' ', '_').lower()}.txt",
+                    mime="text/plain",
                     use_container_width=True
                 )
             except Exception as e:
-                st.error(f"❌ Error generating PDF: {str(e)}")
-                st.button("📥 PDF (Error)", disabled=True, use_container_width=True)
+                st.error(f"❌ Error generating text file: {str(e)}")
+                st.button("📥 Text (Error)", disabled=True, use_container_width=True)
         
         with col2:
             if st.button("🗑️ Clear Cover Letter"):
@@ -1805,7 +1843,7 @@ def job_search_page(job_searcher, groq_service):
     auto_skills = ", ".join(user_skills[:5]) if user_skills else ""
     
     with col1:
-        keywords = st.text_input("🔍 Keywords/Skills:", value=auto_skills, placeholder="e.g. Python, Data Science, React")
+        job_title = st.text_input("💼 Job Title:", placeholder="e.g. Software Engineer, Data Scientist, Product Manager")
         location = st.text_input("📍 Location:", placeholder="e.g. New York, Remote")
     
     with col2:
@@ -1818,21 +1856,18 @@ def job_search_page(job_searcher, groq_service):
     
     with col3:
         limit = st.slider("📊 Results Limit:", 5, 50, 20)
-        sort_by = st.selectbox("🔄 Sort By:", [
-            "Relevance", "Date Posted", "Salary (High to Low)", "Company Rating"
-        ])
     
     col_search1, col_search2, col_search3 = st.columns(3)
     
     with col_search1:
         if st.button("🔍 Search Jobs", type="primary", use_container_width=True):
-            if not keywords.strip():
-                st.error("⚠️ Please enter keywords or skills to search for jobs.")
+            if not job_title.strip():
+                st.error("⚠️ Please enter a job title to search for jobs.")
             else:
                 with st.spinner("🤖 AI is searching for relevant jobs..."):
                     try:
                         jobs = job_searcher.search_jobs(
-                            keywords=keywords,
+                            keywords=job_title,
                             location=location,
                             experience_level=experience_level,
                             job_type=job_type,
@@ -1840,7 +1875,7 @@ def job_search_page(job_searcher, groq_service):
                         )
                         st.session_state.search_results = jobs
                         st.session_state.search_params = {
-                            'keywords': keywords,
+                            'job_title': job_title,
                             'location': location,
                             'experience_level': experience_level,
                             'job_type': job_type
@@ -1885,7 +1920,7 @@ def job_search_page(job_searcher, groq_service):
             skills_text = ", ".join(search_params.get('skills', [])[:3])
             st.info(f"🎯 Personalized recommendations based on your skills: **{skills_text}**")
         else:
-            st.info(f"🔍 Results for **{search_params.get('keywords', 'N/A')}** in **{search_params.get('location', 'All locations')}**")
+            st.info(f"🔍 Results for **{search_params.get('job_title', 'N/A')}** in **{search_params.get('location', 'All locations')}**")
         
         jobs_per_page = 5
         total_pages = (len(jobs) - 1) // jobs_per_page + 1

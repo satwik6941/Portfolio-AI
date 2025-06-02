@@ -18,9 +18,7 @@ class GoogleJobsService:
         self.project_id = project_id or os.getenv('GOOGLE_CLOUD_PROJECT_ID')
         self.credentials_path = credentials_path or os.getenv('GOOGLE_CLOUD_CREDENTIALS_PATH')
         self.client = None
-        self.parent = None
-        
-        # Initialize AI data service for fallback
+        self.parent = None       
         self.ai_data_service = None
         try:
             import os
