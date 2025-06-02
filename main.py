@@ -55,11 +55,6 @@ body, .stApp {
     color: #f8fafc;
 }
 
-.card:hover {
-    border-color: #2563eb;
-    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.18);
-}
-
 .stButton > button {
     background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
     color: #ffffff;
@@ -242,7 +237,9 @@ with st.sidebar:
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("""
+# Display the main introductory section only if not verified
+if not st.session_state.get("verification_completed", False):
+    st.markdown("""
 <div style='text-align: center; margin-bottom: 1.5rem; padding: 1.5rem 1rem;
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
             border-radius: 24px; border: 1px solid rgba(16, 185, 129, 0.3);
@@ -331,13 +328,12 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 def data_input_page(data_extractor):
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("""
-    <h1 style='text-align:center; font-size:2.7rem; font-weight:900; color:#2563eb; letter-spacing:-1px; margin-bottom:0.5em; text-shadow:0 2px 12px rgba(37,99,235,0.18); font-family:Inter,sans-serif;'>
-        ResuMate - AI Career Assistant
+    <h1 style='text-align:left; font-size:2.7rem; font-weight:900; color:#2563eb; letter-spacing:-1px; margin-bottom:0.5em; text-shadow:0 2px 12px rgba(37,99,235,0.18); font-family:Inter,sans-serif; cursor: pointer; transition: color 0.2s ease;'
+    onmouseover="this.style.color='#60a5fa'" onmouseout="this.style.color='#2563eb'">
+        📤 Data Input
     </h1>
     """, unsafe_allow_html=True)
-    st.header("📤 Data Input")
     st.markdown("Upload your resume to automatically extract and edit your profile information.")
     
     st.subheader("📄 Upload Your Resume")
@@ -670,7 +666,7 @@ def data_input_page(data_extractor):
                     st.success("✅ Information saved!")
                     st.rerun()
                 else:
-                    st.error("Please fill in at least Name, Email, and Job Title")
+                    st.error("⚠️ Please fill in at least Name, Email, and Job Title")
     
     elif st.session_state.qa_completed and not st.session_state.verification_completed:
         st.subheader("Step 2: Verification (Mandatory)")
