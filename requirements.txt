@@ -19,4 +19,3 @@ fake-useragent
 scrapy
 aiohttp
 asyncio
-concurrent.futures
