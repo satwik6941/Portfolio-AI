@@ -497,12 +497,10 @@ class GroqLLM:
             skills_str = ', '.join(str(skill) for skill in skills)
         else:
             skills_str = str(skills) if skills else 'Not specified'
-        
         experience = str(user_data.get('experience', 'Professional experience'))
-        
         question_safe = str(question).replace('{', '{{').replace('}', '}}')
         answer_safe = str(answer).replace('{', '{{').replace('}', '}}')
-        
+
         prompt = f"""
         Evaluate this interview answer:
         
@@ -528,15 +526,14 @@ class GroqLLM:
             "feedback": "Good response overall, but could be enhanced with more concrete details."
         }}
         """
-        
+
         messages = [
             {"role": "system", "content": "You are an expert interview coach providing constructive feedback. Return only valid JSON."},
             {"role": "user", "content": prompt}
         ]
-        
+
         try:
             response = self._make_request(messages, max_tokens=800, temperature=0.6)
-            
             json_start = response.find('{')
             json_end = response.rfind('}') + 1
             if json_start != -1 and json_end != 0:
@@ -544,9 +541,20 @@ class GroqLLM:
                 return json.loads(json_str)
         except Exception as e:
             print(f"Error in evaluate_interview_answer: {e}")
-        
+
+        # Fallback: If the answer is very short or obviously bad, give a low score
+        answer_stripped = str(answer).strip().lower()
+        bad_phrases = ["i don't know", "no idea", "not sure", "n/a", "none", "idk", "?", "", "-", "skip", "nothing"]
+        if len(answer_stripped) < 10 or any(p in answer_stripped for p in bad_phrases):
+            return {
+                "score": 2,
+                "strengths": [],
+                "weaknesses": ["Answer is too short or not relevant."],
+                "suggestions": "Try to provide a more complete and relevant answer.",
+                "feedback": "Your answer was too brief or not relevant. Please elaborate and provide examples next time."
+            }
         return {
-            "score": 7,
+            "score": 6,
             "strengths": ["Good effort"],
             "weaknesses": ["Could provide more detail"],
             "suggestions": "Consider using the STAR method for behavioral questions.",
@@ -596,6 +604,7 @@ class GroqLLM:
         for i, (q, a) in enumerate(zip(questions, answers), 1):
             interview_content += f"Q{i}: {q}\nA{i}: {a}\n\n"
         
+        # Use triple curly braces to escape braces in the JSON example for f-string
         prompt = f"""
         Analyze this complete job interview performance:
         
@@ -613,7 +622,7 @@ class GroqLLM:
         Experience: {user_data.get('experience', 'Professional experience')}
         
         Provide comprehensive analysis:
-        {
+        {{
             "overall_score": 8.5,
             "performance_level": "Excellent",
             "strengths": ["Strong communication", "Relevant examples", "Technical knowledge"],
@@ -621,16 +630,13 @@ class GroqLLM:
             "detailed_feedback": "The candidate demonstrated strong technical knowledge and communication skills...",
             "question_scores": [8, 7, 9, 8, 7],
             "recommendations": ["Practice quantifying achievements", "Prepare more leadership stories"]
-        }
+        }}
         """
-        
         messages = [
             {"role": "system", "content": "You are an expert interview analyst providing detailed performance feedback. Return only valid JSON."},
             {"role": "user", "content": prompt}
         ]
-        
         response = self._make_request(messages, max_tokens=1500, temperature=0.6)
-        
         try:
             json_start = response.find('{')
             json_end = response.rfind('}') + 1

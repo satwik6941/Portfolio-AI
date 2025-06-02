@@ -9,16 +9,11 @@ class InterviewSimulator:
         
     def start_interview_session(self, job_description: str, user_background: Dict) -> Dict:
         job_role = user_background.get('target_job_title') or user_background.get('job_title') or ''
-        llm_prompt = f"Generate professional interview questions for the role of '{job_role}'. "
-        if job_description:
-            llm_prompt += f"Job Description: {job_description}. "
-        llm_prompt += "Ask questions that are relevant to the responsibilities, required skills, and typical challenges for this position."
         num_questions = user_background.get('num_questions', 5)
         questions = self.groq_service.generate_interview_questions(
             job_description=job_description,
-            user_background=user_background,
-            num_questions=num_questions,
-            llm_prompt=llm_prompt
+            user_data=user_background,
+            num_questions=num_questions
         )
         session = {
             'questions': questions,
@@ -42,19 +37,16 @@ class InterviewSimulator:
         current_q = self.get_current_question(session)
         if not current_q:
             return None
-        
+        # Always analyze the question and answer with the LLM for scoring
         evaluation = self.groq_service.evaluate_interview_answer(
             current_q['question'], 
             answer, 
             session['user_background']
         )
-        
         session['answers'].append(answer)
         session['scores'].append(evaluation.get('score', 5))
         session['feedback'].append(evaluation)
-        
         session['current_question'] += 1
-        
         return evaluation
     
     def get_final_report(self, session: Dict) -> Dict:
@@ -68,29 +60,20 @@ class InterviewSimulator:
                 'detailed_feedback': []
             }
         
-        avg_score = sum(session['scores']) / len(session['scores'])
+        questions = [q['question'] for q in session['questions']]
+        answers = session['answers']
+        job_info = session['user_background']
+        user_data = session['user_background']
+        analysis = self.groq_service.analyze_chat_interview(questions, answers, job_info, user_data)
         duration_minutes = int((time.time() - session['start_time']) / 60)
         
-        if avg_score >= 8:
-            performance_level = "Excellent"
-            message = "Outstanding performance! You demonstrated strong knowledge and communication skills."
-        elif avg_score >= 6:
-            performance_level = "Good"
-            message = "Good performance overall. With some practice, you can achieve excellence."
-        elif avg_score >= 4:
-            performance_level = "Fair"
-            message = "Fair performance. Focus on providing more detailed and structured answers."
-        else:
-            performance_level = "Needs Improvement"
-            message = "Keep practicing! Consider researching common interview questions and the STAR method."
-        
         return {
-            'overall_score': round(avg_score, 1),
-            'performance_level': performance_level,
-            'message': message,
+            'overall_score': round(analysis.get('overall_score', 0), 1),
+            'performance_level': analysis.get('performance_level', 'N/A'),
+            'message': analysis.get('detailed_feedback', analysis.get('message', 'No feedback available')), # fallback
             'questions_answered': len(session['answers']),
             'duration_minutes': duration_minutes,
-            'detailed_feedback': session['feedback']
+            'detailed_feedback': analysis.get('question_feedback', analysis.get('question_scores', []))
         }
 
 class InterviewUI:
