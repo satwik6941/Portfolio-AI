@@ -19,154 +19,49 @@ st.markdown('''
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* Global App Styling */
 body, .stApp {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%) !important;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1e293b 60%, #2563eb 100%) !important;
     font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
     color: #f8fafc;
 }
 
-/* Main content area */
 .main .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
     max-width: 1200px;
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.6) 100%);
+    background: linear-gradient(135deg, rgba(10, 10, 10, 0.7) 0%, rgba(37, 99, 235, 0.18) 100%);
     border-radius: 24px;
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(148, 163, 184, 0.1);
+    border: 1px solid rgba(37, 99, 235, 0.15);
     margin: 1rem;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Override Streamlit default text colors */
 .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
-    color: #f8fafc !important;
+    color: #e0e7ef !important;
 }
 
 .stApp p, .stApp div, .stApp span, .stApp label {
-    color: #e2e8f0 !important;
+    color: #cbd5e1 !important;
 }
 
-/* Markdown text styling */
-.stMarkdown {
-    color: #e2e8f0 !important;
-}
-
-.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    color: #f8fafc !important;
-}
-
-/* Enhanced Sidebar with Glass Morphism */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 50%, rgba(51, 65, 85, 0.95) 100%) !important;
-    backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(148, 163, 184, 0.1);
-    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.37);
-}
-
-[data-testid="stSidebar"] > div {
-    background: transparent !important;
-}
-
-/* Sidebar Title Styling */
-.sidebar-title {
-    color: #10b981 !important;
-    font-size: 1.8rem;
-    font-weight: 800;
-    text-align: center;
-    padding: 0.8rem 0.5rem;
-    margin-bottom: 1.5rem;
-    border-radius: 16px;
-    border: 1px solid rgba(16, 185, 129, 0.2);
-    background-color: rgba(16, 185, 129, 0.05);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
-    text-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
-}
-
-/* Sidebar User Card */
-.sidebar-user-card {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-    border-radius: 20px;
-    padding: 1.5rem 1.2rem;
-    margin-bottom: 2rem;
-    color: #f8fafc;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.15);
-    transition: all 0.3s ease;
-}
-
-.sidebar-user-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.2);
-}
-
-/* Navigation Radio Buttons */
-[data-testid="stSidebar"] .stRadio > div {
-    gap: 0.5rem;
-}
-
-[data-testid="stSidebar"] .stRadio > div > label {
-    background: rgba(16, 185, 129, 0.1) !important;
-    color: #e2e8f0 !important;
-    border: 1px solid rgba(16, 185, 129, 0.2) !important;
-    border-radius: 12px !important;
-    padding: 0.8rem 1rem !important;
-    margin-bottom: 0.5rem !important;
-    font-size: 1.05rem !important;
-    font-weight: 500 !important;
-    transition: all 0.3s ease !important;
-    backdrop-filter: blur(10px) !important;
-    cursor: pointer !important;
-}
-
-[data-testid="stSidebar"] .stRadio > div > label:hover {
-    background: rgba(16, 185, 129, 0.2) !important;
-    border-color: rgba(16, 185, 129, 0.4) !important;
-    transform: translateX(4px) !important;
-}
-
-[data-testid="stSidebar"] .stRadio > div > label[data-checked="true"] {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    color: #ffffff !important;
-    border-color: #10b981 !important;
-    font-weight: 600 !important;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
-}
-
-/* Modern Card Styling */
 .card {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(16, 185, 129, 0.2);
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(37, 99, 235, 0.13) 100%);
+    border: 1px solid rgba(37, 99, 235, 0.18);
     border-radius: 24px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(37, 99, 235, 0.08);
     padding: 2.5rem 2rem;
     margin-bottom: 2rem;
-    transition: all 0.3s ease;
     color: #f8fafc;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.15);
-    border-color: rgba(16, 185, 129, 0.4);
+    border-color: #2563eb;
+    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.18);
 }
 
-/* Card text styling */
-.card h1, .card h2, .card h3, .card h4, .card h5, .card h6 {
-    color: #f8fafc !important;
-}
-
-.card p, .card div, .card span, .card label {
-    color: #e2e8f0 !important;
-}
-
-/* Enhanced Button Styling */
 .stButton > button {
-    background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
     color: #ffffff;
     border: none;
     border-radius: 12px;
@@ -174,529 +69,163 @@ body, .stApp {
     font-size: 1.1rem;
     font-weight: 600;
     font-family: 'Inter', sans-serif;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.18);
     transition: all 0.3s ease;
-    text-transform: none;
 }
 
 .stButton > button:hover {
-    background: linear-gradient(135deg, #047857 0%, #065f46 50%, #064e3b 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(16, 185, 129, 0.35);
+    box-shadow: 0 6px 25px rgba(37, 99, 235, 0.28);
 }
 
-.stButton > button:active {
-    transform: translateY(0px);
-}
-
-/* Input Field Styling */
-.stTextInput > div > input, 
-.stTextArea > div > textarea,
-.stSelectbox > div > div > input,
-.stNumberInput > div > input {
-    border-radius: 12px;
-    border: 2px solid rgba(16, 185, 129, 0.3) !important;
-    background: rgba(30, 41, 59, 0.9) !important;
-    color: #f8fafc !important;
-    font-size: 1.05rem;
-    padding: 0.8rem 1.2rem;
-    font-family: 'Inter', sans-serif;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-}
-
-.stTextInput > div > input:focus,
-.stTextArea > div > textarea:focus,
-.stSelectbox > div > div > input:focus,
-.stNumberInput > div > input:focus {
-    border-color: #10b981 !important;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3) !important;
-    outline: none !important;
-    background: rgba(30, 41, 59, 1) !important;
-}
-
-/* Placeholder text styling */
-.stTextInput > div > input::placeholder,
-.stTextArea > div > textarea::placeholder {
-    color: #94a3b8 !important;
-}
-
-/* Select box styling */
-.stSelectbox > div > div {
-    background: rgba(30, 41, 59, 0.9) !important;
-    border: 2px solid rgba(16, 185, 129, 0.3) !important;
-    border-radius: 12px !important;
-    color: #f8fafc !important;
-}
-
-.stSelectbox > div > div > div {
-    color: #f8fafc !important;
-    background: rgba(30, 41, 59, 0.9) !important;
-}
-
-/* Dropdown options */
-.stSelectbox [data-baseweb="select"] > div {
-    background: rgba(30, 41, 59, 0.95) !important;
-    color: #f8fafc !important;
-}
-
-/* Text area specific styling */
-.stTextArea > div > textarea {
-    min-height: 120px !important;
-    resize: vertical !important;
-}
-
-/* Alert and Feedback Styling */
-.stAlert {
+.stFileUploader {
+    border: 2px dashed rgba(37, 99, 235, 0.3);
     border-radius: 16px;
-    font-size: 1.08rem;
-    border: none;
-    backdrop-filter: blur(10px);
+    background: rgba(37, 99, 235, 0.05);
+    padding: 2rem;
+    text-align: center;
+    color: #e0e7ef !important;
 }
 
-.stSuccess {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
-    border-left: 4px solid #10b981;
-    color: #065f46;
+.stFileUploader:hover {
+    border-color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
 }
 
-.stError {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
-    border-left: 4px solid #ef4444;
-    color: #991b1b;
-}
-
-.stWarning {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
-    border-left: 4px solid #f59e0b;
-    color: #92400e;
-}
-
-.stInfo {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
-    border-left: 4px solid #3b82f6;
-    color: #1d4ed8;
-}
-
-/* Expander and Tab Styling */
-.stExpander {
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-}
-
-.stTabs {
-    background: transparent;
-}
-
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-}
-
-.stTabs [data-baseweb="tab"] {
-    background: rgba(148, 163, 184, 0.1);
-    border-radius: 12px;
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    color: #64748b;
-    font-weight: 500;
-}
-
-.stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-}
-
-/* Metrics Enhancement */
 .stMetric {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 16px;
-    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
-    padding: 1.5rem;
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    color: #f8fafc !important;
 }
 
 .stMetric:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
-}
-
-/* File Uploader Styling */
-.stFileUploader {
-    border: 2px dashed rgba(16, 185, 129, 0.3);
-    border-radius: 16px;
-    background: rgba(16, 185, 129, 0.05);
-    padding: 2rem;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.stFileUploader:hover {
-    border-color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
-}
-
-/* Progress Bar */
-.stProgress > div > div {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    border-radius: 6px;
-}
-
-/* Selectbox Styling */
-.stSelectbox > div > div {
-    border-radius: 12px;
-    border: 2px solid rgba(148, 163, 184, 0.3);
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-}
-
-/* Hide Streamlit Branding */
-footer {visibility: hidden;}
-.viewerBadge_container__1QSob {visibility: hidden;}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(148, 163, 184, 0.1);
-    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.13);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    border-radius: 4px;
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
 }
 
-/* Additional Enhancements for Better UX */
-
-/* Loading Animation */
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+.sidebar-nav .stRadio > div {
+    gap: 0.7rem;
 }
 
-.loading-pulse {
-    animation: pulse 2s infinite;
-}
-
-/* Smooth transitions for interactive elements */
-* {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Enhanced form styling */
-.stForm {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%) !important;
-    border-radius: 20px !important;
-    padding: 2rem !important;
-    border: 1px solid rgba(16, 185, 129, 0.2) !important;
-    backdrop-filter: blur(20px) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-    color: #f8fafc !important;
-}
-
-/* Enhanced checkbox and radio styling */
-.stCheckbox > label, .stRadio > label {
-    font-weight: 500 !important;
-    color: #e2e8f0 !important;
-}
-
-.stCheckbox > div > label > div,
-.stRadio > div > label > div {
-    color: #e2e8f0 !important;
-}
-
-/* File uploader styling */
-.stFileUploader {
-    border: 2px dashed rgba(16, 185, 129, 0.5) !important;
-    border-radius: 16px !important;
-    background: rgba(30, 41, 59, 0.7) !important;
-    padding: 2rem !important;
-    text-align: center !important;
-    transition: all 0.3s ease !important;
-    color: #e2e8f0 !important;
-}
-
-.stFileUploader:hover {
-    border-color: #10b981 !important;
-    background: rgba(30, 41, 59, 0.9) !important;
-}
-
-.stFileUploader > div > div > div {
-    color: #e2e8f0 !important;
-}
-
-/* Upload button styling */
-.stFileUploader button {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 0.5rem 1rem !important;
-}
-
-/* Success message styling */
-.success-message {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 16px;
-    padding: 1.5rem;
-    color: #065f46;
-    font-weight: 500;
-}
-
-/* Modern tooltip styling */
-[data-testid="stTooltipHoverTarget"] {
-    color: #10b981;
-}
-
-/* Enhanced spinner */
-.stSpinner > div {
-    border-color: #10b981 !important;
-}
-
-/* Better link styling */
-a {
-    color: #10b981;
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.3s ease;
-}
-
-a:hover {
-    color: #047857;
-    text-decoration: underline;
-}
-
-/* Column spacing improvements */
-.row-widget.stHorizontal > div {
-    padding-right: 1rem;
-}
-
-/* Image styling improvements */
-img {
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
-}
-
-/* DataEditor and DataFrame styling */
-.stDataEditor, .stDataFrame {
-    border-radius: 16px;
-    overflow: hidden;
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
-}
-
-/* Chart container styling */
-.stPlotlyChart {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 16px;
-    padding: 1rem;
-    border: 1px solid rgba(148, 163, 184, 0.1);
-    backdrop-filter: blur(10px);
-}
-
-/* Additional text visibility fixes */
-.stApp [data-testid="stHeader"] {
-    background: transparent !important;
-}
-
-/* Fix all text elements in main content */
-.main .element-container div, 
-.main .element-container p,
-.main .element-container span,
-.main .element-container label {
-    color: #e2e8f0 !important;
-}
-
-/* Ensure headers are visible */
-.main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
-    color: #f8fafc !important;
+.sidebar-nav .stRadio > div > label {
+    background: linear-gradient(135deg, #0a0a0a 0%, #2563eb 100%) !important;
+    color: #e0e7ef !important;
+    border: 2px solid rgba(37, 99, 235, 0.22) !important;
+    border-radius: 14px !important;
+    padding: 1.1rem 1.2rem !important;
+    margin-bottom: 0.7rem !important;
+    font-size: 1.13rem !important;
     font-weight: 600 !important;
+    font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif !important;
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1) !important;
+    box-shadow: 0 2px 12px rgba(37,99,235,0.10) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+    outline: none !important;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Subheader styling */
-.stSubheader {
-    color: #cbd5e1 !important;
+.sidebar-nav .stRadio > div > label:hover {
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%) !important;
+    color: #fff !important;
+    border-color: #2563eb !important;
+    transform: scale(1.04) translateY(-2px);
+    box-shadow: 0 6px 24px rgba(37,99,235,0.18) !important;
 }
 
-/* Column text styling */
-.stColumn div, .stColumn p, .stColumn span {
-    color: #e2e8f0 !important;
+.sidebar-nav .stRadio > div > label[data-checked="true"] {
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+    color: #fff !important;
+    border-color: #2563eb !important;
+    font-weight: 800 !important;
+    box-shadow: 0 4px 18px rgba(37,99,235,0.22) !important;
 }
 
-/* Caption text */
-.stCaption {
-    color: #94a3b8 !important;
-}
-
-/* Success/Error message text visibility */
-.stSuccess div, .stError div, .stWarning div, .stInfo div {
-    color: inherit !important;
-}
-
-/* Expander text */
-.stExpander div, .stExpander p, .stExpander span {
-    color: #e2e8f0 !important;
-}
-
-/* Tab text */
-.stTabs div, .stTabs p, .stTabs span {
-    color: #e2e8f0 !important;
-}
-
-/* Metric text */
-.stMetric {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%) !important;
-    border: 1px solid rgba(16, 185, 129, 0.2) !important;
-    color: #f8fafc !important;
-}
-
-.stMetric div, .stMetric span {
-    color: #f8fafc !important;
-}
-
-/* Code block styling */
-.stCode {
-    background: rgba(15, 23, 42, 0.9) !important;
-    border: 1px solid rgba(16, 185, 129, 0.2) !important;
-    color: #e2e8f0 !important;
-}
-
-/* JSON display styling */
-.stJson {
-    background: rgba(15, 23, 42, 0.9) !important;
-    border: 1px solid rgba(16, 185, 129, 0.2) !important;
-    color: #e2e8f0 !important;
-}
-
-/* Ensure label text is visible */
-label {
-    color: #e2e8f0 !important;
-    font-weight: 500 !important;
-}
-
-/* Fix widget labels */
-.stWidget > label {
-    color: #e2e8f0 !important;
-}
-
-/* Progress text */
-.stProgress div {
-    color: #e2e8f0 !important;
-}
-
-/* Slider text */
-.stSlider div {
-    color: #e2e8f0 !important;
-}
-
-/* Number input styling */
-.stNumberInput label {
-    color: #e2e8f0 !important;
-}
-
-/* Date input styling */
-.stDateInput label, .stTimeInput label {
-    color: #e2e8f0 !important;
-}
-
-/* All divs inside main content area */
-.main [data-testid="stVerticalBlock"] div {
-    color: #e2e8f0 !important;
-}
-
-/* Force all text in main to be visible */
-.main * {
-    color: #e2e8f0 !important;
-}
-
-.main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
-    color: #f8fafc !important;
-}
-
-/* Additional text visibility fixes for specific elements */
-[data-testid="stText"], [data-testid="stMarkdown"] {
-    color: #e2e8f0 !important;
-}
-
-/* Fix any remaining text elements */
-.stApp p, .stApp span, .stApp div:not([data-testid="stSidebar"]) {
-    color: #e2e8f0 !important;
-}
-
-/* Ensure title text is always visible */
-h1, h2, h3, h4, h5, h6 {
-    color: #f8fafc !important;
+/* Hide the default radio dot */
+.sidebar-nav .stRadio input[type="radio"] {
+    display: none;
 }
 </style>
 ''', unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown('''
-    <div class="sidebar-title">
-        ResuMate - AI Career Assistant
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    st.markdown('''
-    <div style="text-align: center; margin-bottom: 1.5rem;">
-        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                    width: 80px; height: 80px; border-radius: 20px; 
-                    display: inline-flex; align-items: center; justify-content: center;
-                    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
-                    border: 2px solid rgba(16, 185, 129, 0.2);">
-            <span style="font-size: 2.5rem;">🎯</span>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    user = st.session_state.get('user_data', {})
-    if user.get('name') and user.get('email'):
-        st.markdown(f'''
-        <div class="sidebar-user-card">
-            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
-                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                            width: 45px; height: 45px; border-radius: 12px; 
-                            display: flex; align-items: center; justify-content: center;
-                            font-size: 1.2rem; font-weight: 700; color: white;">
-                    {user.get('name', 'U')[0].upper()}
-                </div>
-                <div>
-                    <div style="font-size: 1.15rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.2rem;">
-                        {user.get('name', 'User')}
-                    </div>
-                    <div style="font-size: 0.9rem; color: #94a3b8;">
-                        {user.get('title', 'Professional')}
-                    </div>
-                </div>
-            </div>
-            <div style="font-size: 0.85rem; color: #cbd5e1; padding: 0.5rem 0.8rem; 
-                        background: rgba(148, 163, 184, 0.1); border-radius: 8px; margin-top: 0.8rem;">
-                📧 {user.get('email', 'email@example.com')}
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    st.markdown('''
     <style>
-    /* Override default radio button styling for navigation */
-    .nav-container .stRadio > div {
-        gap: 0.3rem;
+    .sidebar-title {
+        color: #2563eb !important;
+        font-size: 2.1rem;
+        font-weight: 900;
+        text-align: center;
+        padding: 1.1rem 0.5rem 1.1rem 0.5rem;
+        margin-bottom: 2.2rem;
+        border-radius: 18px;
+        border: 2px solid rgba(37, 99, 235, 0.22);
+        background: linear-gradient(135deg, rgba(37,99,235,0.13) 0%, rgba(10,10,10,0.7) 100%);
+        box-shadow: 0 6px 32px rgba(37,99,235,0.13);
+        letter-spacing: -1.5px;
+        text-shadow: 0 2px 12px rgba(37,99,235,0.18);
+        font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
+    }
+    .sidebar-nav .stRadio > div {
+        gap: 0.7rem;
+    }
+    .sidebar-nav .stRadio > div > label {
+        background: linear-gradient(135deg, #0a0a0a 0%, #2563eb 100%) !important;
+        color: #e0e7ef !important;
+        border: 2px solid rgba(37, 99, 235, 0.22) !important;
+        border-radius: 14px !important;
+        padding: 1.1rem 1.2rem !important;
+        margin-bottom: 0.7rem !important;
+        font-size: 1.13rem !important;
+        font-weight: 600 !important;
+        font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif !important;
+        transition: all 0.2s cubic-bezier(0.4,0,0.2,1) !important;
+        box-shadow: 0 2px 12px rgba(37,99,235,0.10) !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        outline: none !important;
+        position: relative;
+        overflow: hidden;
+    }
+    .sidebar-nav .stRadio > div > label:hover {
+        background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%) !important;
+        color: #fff !important;
+        border-color: #2563eb !important;
+        transform: scale(1.04) translateY(-2px);
+        box-shadow: 0 6px 24px rgba(37,99,235,0.18) !important;
+    }
+    .sidebar-nav .stRadio > div > label[data-checked="true"] {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+        color: #fff !important;
+        border-color: #2563eb !important;
+        font-weight: 800 !important;
+        box-shadow: 0 4px 18px rgba(37,99,235,0.22) !important;
+    }
+    /* Hide the default radio dot */
+    .sidebar-nav .stRadio input[type="radio"] {
+        display: none;
     }
     </style>
-    <div class="nav-container">
+    <div class="sidebar-title">
+        ResuMate<br><span style="font-size:1.1rem;font-weight:600;letter-spacing:0.5px;color:#60a5fa;">AI Career Assistant</span>
+    </div>
+    <div class="sidebar-nav">
     ''', unsafe_allow_html=True)
-    
     page = st.radio(
         "",
         [
@@ -711,7 +240,6 @@ with st.sidebar:
         key="main_nav_radio",
         label_visibility="collapsed"
     )
-    
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("""
@@ -804,6 +332,11 @@ if "chat_history" not in st.session_state:
 
 def data_input_page(data_extractor):
     st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("""
+    <h1 style='text-align:center; font-size:2.7rem; font-weight:900; color:#2563eb; letter-spacing:-1px; margin-bottom:0.5em; text-shadow:0 2px 12px rgba(37,99,235,0.18); font-family:Inter,sans-serif;'>
+        ResuMate - AI Career Assistant
+    </h1>
+    """, unsafe_allow_html=True)
     st.header("📤 Data Input")
     st.markdown("Upload your resume to automatically extract and edit your profile information.")
     
@@ -1442,30 +975,17 @@ def resume_page(groq_service, resume_gen):
             value=False,
             help="Automatically add projects that were extracted from your uploaded resume"
         )
-        
         if import_resume_projects:
-            for extracted_project in extracted_projects:
-                project_exists = any(
-                    proj.get('title', '').lower() == extracted_project.get('title', '').lower() 
-                    for proj in st.session_state.resume_projects
-                )
-                if not project_exists:
-                    resume_project = {
-                        'title': extracted_project.get('title', 'Untitled Project'),
-                        'description': extracted_project.get('description', 'No description available'),
-                        'technologies': extracted_project.get('technologies', ''),
-                        'duration': extracted_project.get('duration', 'Not specified'),
-                        'still_working': False
-                    }
-                    st.session_state.resume_projects.append(resume_project)
-            
-            if st.session_state.resume_projects:
-                st.success(f"✅ Imported {len([p for p in st.session_state.resume_projects if any(ep.get('title', '').lower() == p.get('title', '').lower() for ep in extracted_projects)])} projects from your resume!")
+            existing_titles = {p.get('title') for p in st.session_state.resume_projects}
+            new_projects = [p for p in extracted_projects if p.get('title') not in existing_titles]
+            if new_projects:
+                st.session_state.resume_projects.extend(new_projects)
+                st.success(f"✅ Imported {len(new_projects)} project(s) from resume.")
                 st.rerun()
     
     with st.expander("➕ Add New Project", expanded=False):
         with st.form("project_form"):
-            project_title = st.text_input("🏗️ Project Title:", placeholder="e.g., E-commerce Website Development")
+            project_title = st.text_input("🏗️ Project Title:", placeholder="e.g., E-commerce Website")
             project_description = st.text_area(
                 "📝 Project Description:", 
                 height=100,
@@ -1749,7 +1269,7 @@ def cover_letter_page(groq_service, cover_letter_gen):
     job_description = st.text_area(
         "📄 Job Description:",
         height=150,
-        placeholder="Paste the complete job description here. AI will analyze requirements and tailor your cover letter accordingly...",
+        placeholder="Paste the complete job description here for AI to analyze requirements and tailor your cover letter accordingly...",
         help="The more detailed the job description, the better AI can customize your cover letter"
     )
     

@@ -8,8 +8,18 @@ class InterviewSimulator:
         self.groq_service = groq_service
         
     def start_interview_session(self, job_description: str, user_background: Dict) -> Dict:
-        questions = self.groq_service.generate_interview_questions(job_description, user_background)
-        
+        job_role = user_background.get('target_job_title') or user_background.get('job_title') or ''
+        llm_prompt = f"Generate professional interview questions for the role of '{job_role}'. "
+        if job_description:
+            llm_prompt += f"Job Description: {job_description}. "
+        llm_prompt += "Ask questions that are relevant to the responsibilities, required skills, and typical challenges for this position."
+        num_questions = user_background.get('num_questions', 5)
+        questions = self.groq_service.generate_interview_questions(
+            job_description=job_description,
+            user_background=user_background,
+            num_questions=num_questions,
+            llm_prompt=llm_prompt
+        )
         session = {
             'questions': questions,
             'current_question': 0,
@@ -18,7 +28,8 @@ class InterviewSimulator:
             'feedback': [],
             'job_description': job_description,
             'user_background': user_background,
-            'start_time': time.time()        }
+            'start_time': time.time()
+        }
         
         return session
     
