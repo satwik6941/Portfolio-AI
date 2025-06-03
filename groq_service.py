@@ -432,7 +432,6 @@ class GroqLLM:
         else:
             skills_str = str(skills) if skills else 'Various skills'
         experience = str(user_data.get('experience', 'Professional experience'))
-        
         prompt = f"""
         Generate {num_questions} interview questions for this position:
         
@@ -462,30 +461,46 @@ class GroqLLM:
             ...
         ]
         """
-        
         messages = [
             {"role": "system", "content": "You are an expert interview coach who creates thoughtful, relevant interview questions. Return only valid JSON array."},
             {"role": "user", "content": prompt}
         ]
-        
         try:
             response = self._make_request(messages, max_tokens=1500, temperature=0.7)
-            
             json_start = response.find('[')
             json_end = response.rfind(']') + 1
             if json_start != -1 and json_end != 0:
                 json_str = response[json_start:json_end]
                 questions = json.loads(json_str)
-                return questions if isinstance(questions, list) else []
+                if isinstance(questions, list):
+                    # Always return exactly num_questions
+                    if len(questions) > num_questions:
+                        return questions[:num_questions]
+                    elif len(questions) < num_questions:
+                        # Pad with generic questions if too few
+                        default_qs = [
+                            {"question": "Tell me about yourself and your background.", "type": "General", "difficulty": "Easy", "category": "Introduction"},
+                            {"question": "Why are you interested in this position?", "type": "Behavioral", "difficulty": "Easy", "category": "Motivation"},
+                            {"question": "Describe a challenging project you worked on and how you handled it.", "type": "Behavioral", "difficulty": "Medium", "category": "Problem Solving"},
+                            {"question": "What are your greatest strengths and how do they apply to this role?", "type": "General", "difficulty": "Medium", "category": "Self Assessment"},
+                            {"question": "Where do you see yourself in 5 years?", "type": "General", "difficulty": "Medium", "category": "Career Goals"}
+                        ]
+                        while len(questions) < num_questions:
+                            questions.append(default_qs[len(questions) % len(default_qs)])
+                        return questions
+                    else:
+                        return questions
         except Exception as e:
             print(f"Error generating interview questions: {e}")
-        return [
+        # Fallback: always return exactly num_questions
+        default_qs = [
             {"question": "Tell me about yourself and your background.", "type": "General", "difficulty": "Easy", "category": "Introduction"},
             {"question": "Why are you interested in this position?", "type": "Behavioral", "difficulty": "Easy", "category": "Motivation"},
             {"question": "Describe a challenging project you worked on and how you handled it.", "type": "Behavioral", "difficulty": "Medium", "category": "Problem Solving"},
             {"question": "What are your greatest strengths and how do they apply to this role?", "type": "General", "difficulty": "Medium", "category": "Self Assessment"},
             {"question": "Where do you see yourself in 5 years?", "type": "General", "difficulty": "Medium", "category": "Career Goals"}
         ]
+        return [default_qs[i % len(default_qs)] for i in range(num_questions)]
 
     def generate_interview_question(self, user_data: Dict[str, Any], job_description: str = "") -> str:
         questions = self.generate_interview_questions(job_description, user_data, 1)
