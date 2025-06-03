@@ -10,7 +10,7 @@ except ImportError:
     search = None
 
 class GroqLLM:
-    def __init__(self, api_key: str, model: str = "llama3-70b-8192"):
+    def __init__(self, api_key: str, model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"):
         self.api_key = api_key
         self.model = model
         self.base_url = "https://api.groq.com/openai/v1/chat/completions"
