@@ -237,7 +237,6 @@ with st.sidebar:
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Display the main introductory section only if not verified
 if not st.session_state.get("verification_completed", False):
     st.markdown("""
 <div style='text-align: center; margin-bottom: 1.5rem; padding: 1.5rem 1rem;
@@ -894,7 +893,7 @@ def portfolio_page(groq_service, portfolio_gen):
             st.session_state.portfolio_html = html_content;
             
             st.subheader("🌟 Portfolio Preview")
-            st.components.v1.html(html_content, height=900, scrolling=True)
+            st.components.v1.html(f"<div style='max-width: 98vw; margin: 0 auto'>"+html_content+"</div>", height=900, scrolling=True)
             
             st.download_button(
                 label="📥 Download HTML",
