@@ -893,7 +893,7 @@ def portfolio_page(groq_service, portfolio_gen):
             st.session_state.portfolio_html = html_content;
             
             st.subheader("🌟 Portfolio Preview")
-            st.components.v1.html(f"<div style='max-width: 98vw; margin: 0 auto'>"+html_content+"</div>", height=900, scrolling=True)
+            st.components.v1.html(f"<div style='max-width: 98vw; margin: 0 auto'>"+html_content+"</div>", height=900, scrolling=True, width='100%')
             
             st.download_button(
                 label="📥 Download HTML",
