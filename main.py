@@ -326,13 +326,12 @@ if "search_results" not in st.session_state:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-def data_input_page(data_extractor):
+def data_input_page(data_extractor, groq_service):
     st.markdown("""
     <h1 style='text-align:left; font-size:2.7rem; font-weight:900; color:#2563eb; letter-spacing:-1px; margin-bottom:0.5em; text-shadow:0 2px 12px rgba(37,99,235,0.18); font-family:Inter,sans-serif; cursor: pointer; transition: color 0.2s ease;'
     onmouseover="this.style.color='#60a5fa'" onmouseout="this.style.color='#2563eb'">
         📤 Data Input
-    </h1>
-    """, unsafe_allow_html=True)
+    </h1>    """, unsafe_allow_html=True)
     st.markdown("Upload your resume to automatically extract and edit your profile information.")
     
     st.subheader("📄 Upload Your Resume")
@@ -344,21 +343,38 @@ def data_input_page(data_extractor):
     
     if uploaded_file and not st.session_state.verification_completed:
         with st.spinner("🤖 Extracting and analyzing your resume..."):
-            extracted_text = data_extractor.extract_from_file(uploaded_file)
-            
-            if extracted_text:
-                groq_service = initialize_services()[0]
-                if groq_service:
-                    parsed_data = groq_service.parse_resume_data(extracted_text)
-                    st.session_state.extracted_data = parsed_data
-                    st.session_state.user_data.update(parsed_data)
-                    st.session_state.verification_completed = True
-                    st.success("✅ Resume processed successfully!")
-                    st.rerun()
+            try:
+                extracted_text = data_extractor.extract_from_file(uploaded_file)
+                if extracted_text and len(extracted_text.strip()) > 20:
+                    try:
+                        parsed_data = groq_service.parse_resume_data(extracted_text)
+                        if parsed_data and isinstance(parsed_data, dict):
+                            st.session_state.extracted_data = parsed_data
+                            st.session_state.user_data.update(parsed_data)
+                            st.session_state.verification_completed = True
+                            st.success("✅ Resume processed successfully!")
+                            
+                            # Show a brief summary of extracted data
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.info(f"📧 **Email:** {parsed_data.get('email', 'Not found')}")
+                                st.info(f"👤 **Name:** {parsed_data.get('name', 'Not found')}")
+                            with col2:
+                                st.info(f"🛠️ **Skills:** {len(parsed_data.get('skills', []))} found")
+                                st.info(f"🚀 **Projects:** {len(parsed_data.get('projects', []))} found")
+                            
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to parse resume data. Please try manual entry or a different file format.")
+                    except Exception as e:
+                        st.error(f"❌ Error processing resume: {str(e)}")
+                        st.info("💡 Try using the manual entry option below or upload a different file format.")
                 else:
-                    st.error("Failed to initialize AI service")
-            else:
-                st.error("Failed to extract text from file")
+                    st.error("❌ Could not extract readable text from the file.")
+                    st.info("💡 Please ensure your file contains readable text and try again, or use manual entry.")
+            except Exception as e:
+                st.error(f"❌ Error reading file: {str(e)}")
+                st.info("💡 Please check your file format and try again.")
     
     if st.session_state.verification_completed and st.session_state.extracted_data:
         st.subheader("✏️ Review and Edit Your Information")
@@ -586,7 +602,7 @@ def data_input_page(data_extractor):
                                 st.write(f"**Duration:** {project.get('duration')}")
                     
                     with col_actions:
-                        if not st.session_state.get(f'editing_project_{i}', False):
+                        if not st.session_state.get(f'editing_project_{i}', False):                            
                             if st.button("✏️", key=f"edit_project_btn_{i}", help="Edit this project"):
                                 st.session_state[f'editing_project_{i}'] = True
                                 st.rerun()
@@ -633,7 +649,7 @@ def data_input_page(data_extractor):
                         st.session_state.adding_new_project = False
                         st.rerun()
     
-    elif not uploaded_file:
+    if not uploaded_file and not st.session_state.verification_completed:
         st.subheader("✏️ Manual Information Entry")
         st.info("💡 Upload a resume above for automatic extraction, or fill in manually below:")
         
@@ -679,8 +695,7 @@ def data_input_page(data_extractor):
         if verification_method == "Upload CV/Resume":
             uploaded_file = st.file_uploader(
                 "Upload your CV/Resume", 
-                type=["pdf", "docx", "jpg", "jpeg", "png"]
-            )
+                type=["pdf", "docx", "jpg", "jpeg", "png"]            )
             if uploaded_file:
                 try:
                     with st.spinner("Extracting and verifying data..."):
@@ -716,9 +731,9 @@ def data_input_page(data_extractor):
                         
                         if st.button("Complete Profile"):
                             st.success("🎉 Profile completed! You can now use all features.")
-                            st.rerun()
-                    else:
-                        st.error("Failed to extract LinkedIn data")
+                            st.rerun()                    
+                        else:
+                            st.error("Failed to extract LinkedIn data")
     
     elif st.session_state.qa_completed and st.session_state.verification_completed:
         st.success("✅ Profile completed successfully!")
@@ -733,12 +748,6 @@ def data_input_page(data_extractor):
         with col2:
             st.write(f"**Title:** {st.session_state.user_data.get('title', 'N/A')}")
             st.write(f"**Verification:** {st.session_state.user_data.get('verification_source', 'N/A')}")
-        
-        if st.button("Reset Profile"):
-            st.session_state.qa_completed = False
-            st.session_state.verification_completed = False
-            st.session_state.user_data = {}
-            st.rerun()
 
 def portfolio_page(groq_service, portfolio_gen):
     st.header("🌐 Portfolio Generator")
@@ -1702,7 +1711,7 @@ def resume_chat_page(groq_service):
     st.markdown('</div>', unsafe_allow_html=True)
 
 if page == "📤 Data Input":
-    data_input_page(data_extractor)
+    data_input_page(data_extractor, groq_service)
 elif page == "🌐 Portfolio Generator":
     portfolio_page(groq_service, portfolio_gen)
 elif page == "📄 Resume Generator":

@@ -1,0 +1,450 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sarah Chen - Portfolio</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #10B981;
+            --secondary-color: #059669;
+            --accent-color: #FBBF24;
+            --text-color: #064E3B;
+            --card-bg: #F0FDF4;
+            --section-bg: #ECFDF5;
+            --background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: var(--background);
+            background-attachment: fixed;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+        
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+        }
+        
+        .hero h1 {
+            font-size: 4rem;
+            color: white;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .hero p {
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 2rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: linear-gradient(45deg, var(--accent-color), var(--primary-color));
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+        
+        .section {
+            padding: 100px 0;
+            background: var(--section-bg);
+        }
+        
+        .section:nth-child(even) {
+            background: var(--card-bg);
+        }
+        
+        .section h2 {
+            text-align: center;
+            margin-bottom: 4rem;
+            font-size: 3rem;
+            color: var(--primary-color);
+            position: relative;
+        }
+        
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .skill-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .skill-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            border-color: var(--primary-color);
+        }
+        
+        .skill-card i {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .skill-card h3 {
+            color: var(--text-color);
+            margin-bottom: 1rem;
+        }
+        
+        .skill-card p {
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+        
+        .experience-item {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--accent-color);
+        }
+        
+        .experience-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+        }
+        
+        .experience-item h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-size: 1.4rem;
+        }
+        
+        .experience-item .company {
+            color: var(--secondary-color);
+            font-style: italic;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .experience-item p {
+            color: var(--text-color);
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            nav ul {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .skills-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Style-specific customizations */
+        
+        /* Tech Developer Style */
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+            background-attachment: fixed !important;
+        }
+        .hero {
+            position: relative !important;
+            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 2px, transparent 2px) !important;
+            background-size: 30px 30px !important;
+        }
+        .hero::before {
+            content: '</>' !important;
+            position: absolute !important;
+            top: 20% !important;
+            right: 10% !important;
+            font-size: 15rem !important;
+            opacity: 0.1 !important;
+            font-family: 'Consolas', monospace !important;
+            color: var(--accent-color) !important;
+        }
+        .hero h1 {
+            font-family: 'Consolas', monospace !important;
+            position: relative !important;
+        }
+        .hero h1::before {
+            content: '$ ' !important;
+            color: var(--accent-color) !important;
+        }
+        .skill-card {
+            background: var(--card-bg) !important;
+            border: 2px solid var(--primary-color) !important;
+            border-radius: 8px !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+        .skill-card::before {
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 4px !important;
+            height: 100% !important;
+            background: var(--accent-color) !important;
+        }
+        .skill-card:hover {
+            border-color: var(--accent-color) !important;
+            box-shadow: 0 0 20px rgba(var(--primary-color), 0.3) !important;
+        }
+        .experience-item {
+            border-left: 6px solid var(--primary-color) !important;
+            margin-left: 30px !important;
+            position: relative !important;
+            background: var(--card-bg) !important;
+            border-radius: 8px !important;
+        }
+        .experience-item::before {
+            content: '' !important;
+            position: absolute !important;
+            left: -12px !important;
+            top: 20px !important;
+            width: 12px !important;
+            height: 12px !important;
+            background: var(--accent-color) !important;
+            border-radius: 50% !important;
+        }
+        .section h2 {
+            font-family: 'Consolas', monospace !important;
+            position: relative !important;
+        }
+        .section h2::before {
+            content: '// ' !important;
+            color: var(--primary-color) !important;
+        }
+        nav {
+            background: rgba(0,0,0,0.8) !important;
+            backdrop-filter: blur(10px) !important;
+        }
+        nav a {
+            font-family: 'Consolas', monospace !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            border-radius: 4px !important;
+        }
+            
+    </style>
+</head>
+<body>    <header>
+        <nav class="container">
+            <ul>
+                <li><a href="#hero"><i class="fas fa-home"></i> Home</a></li>
+                <li><a href="#about"><i class="fas fa-user"></i> About</a></li>
+                <li><a href="#skills"><i class="fas fa-cogs"></i> Skills</a></li>
+                <li><a href="#projects"><i class="fas fa-code"></i> Projects</a></li>
+                <li><a href="#experience"><i class="fas fa-briefcase"></i> Experience</a></li>
+                <li><a href="#contact"><i class="fas fa-envelope"></i> Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section id="hero" class="hero">
+        <div class="container">
+            <h1>Sarah Chen</h1>
+            <p>Senior Software Engineer | Technology Expert</p>
+            <a href="#contact" class="btn"><i class="fas fa-paper-plane"></i> Get In Touch</a>
+        </div>
+    </section>
+
+    <section id="about" class="section">
+        <div class="container">
+            <h2><i class="fas fa-user-circle"></i> About Me</h2>
+            <div style="text-align: center; max-width: 800px; margin: 0 auto; font-size: 1.2rem;">
+                <p>Experienced software engineer with 6+ years in full-stack development, specializing in modern web technologies and cloud architecture.</p>
+            </div>
+        </div>
+    </section>    <section id="skills" class="section">
+        <div class="container">
+            <h2><i class="fas fa-star"></i> Skills & Expertise</h2>
+            <div class="skills-grid">
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>Python</h3>
+                    <p>Proficient in Python with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>JavaScript</h3>
+                    <p>Proficient in JavaScript with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>React</h3>
+                    <p>Proficient in React with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>Node.js</h3>
+                    <p>Proficient in Node.js with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>AWS</h3>
+                    <p>Proficient in AWS with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>Docker</h3>
+                    <p>Proficient in Docker with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>PostgreSQL</h3>
+                    <p>Proficient in PostgreSQL with hands-on experience</p>
+                </div>
+                
+                <div class="skill-card">
+                    <i class="fas fa-code"></i>
+                    <h3>Redis</h3>
+                    <p>Proficient in Redis with hands-on experience</p>
+                </div>
+                
+                
+            </div>
+        </div>
+    </section>
+
+    <section id="projects" class="section">
+        <div class="container">
+            <h2><i class="fas fa-code"></i> Featured Projects</h2>
+            
+            <div class="experience-item">
+                <h3>E-commerce Analytics Platform</h3>
+                <div class="company">Python, React, PostgreSQL, AWS | 2023</div>
+                <p>Built a real-time analytics platform for e-commerce data processing over 1M transactions daily.</p>
+            </div>
+            
+            <div class="experience-item">
+                <h3>Social Media Dashboard</h3>
+                <div class="company">JavaScript, Vue.js, Node.js, MongoDB | 2022</div>
+                <p>Created a social media management dashboard with automated posting and analytics features.</p>
+            </div>
+            
+            
+        </div>
+    </section>
+
+    <section id="experience" class="section">
+        <div class="container">
+            <h2><i class="fas fa-briefcase"></i> Professional Experience</h2>
+            
+            <div class="experience-item">
+                <h3>Senior Software Engineer</h3>
+                <div class="company">TechFlow Inc. | 2022-Present</div>
+                <p>Lead development of microservices architecture serving 100k+ users. Implemented CI/CD pipelines reducing deployment time by 70%.</p>
+            </div>
+            
+            <div class="experience-item">
+                <h3>Software Engineer</h3>
+                <div class="company">StartupXYZ | 2020-2022</div>
+                <p>Developed responsive web applications using React and Node.js. Collaborated with cross-functional teams to deliver features on time.</p>
+            </div>
+            
+            
+        </div>
+    </section>
+
+    <section id="contact" class="section">
+        <div class="container">
+            <h2><i class="fas fa-envelope"></i> Contact Me</h2>
+            <div style="text-align: center;">
+                <p><strong>Email:</strong> sarah.chen@email.com</p>
+                <p><strong>Phone:</strong> +1-555-987-6543</p>
+                <p><strong>LinkedIn:</strong> <a href="https://linkedin.com/in/sarah-chen" style="color: var(--primary-color);">https://linkedin.com/in/sarah-chen</a></p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>        
