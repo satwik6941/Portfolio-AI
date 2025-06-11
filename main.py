@@ -354,7 +354,6 @@ def data_input_page(data_extractor, groq_service):
                             st.session_state.verification_completed = True
                             st.success("✅ Resume processed successfully!")
                             
-                            # Show a brief summary of extracted data
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.info(f"📧 **Email:** {parsed_data.get('email', 'Not found')}")
@@ -826,19 +825,18 @@ def portfolio_page(groq_service, portfolio_gen):
         
         with st.expander("📋 View Generated Content", expanded=False):
             st.json(portfolio_content)
-        
         try:
             template_data = {
-                'name': st.session_state.user_data.get('name'),
+                'name': st.session_state.user_data.get('name') or 'Professional Portfolio',
                 'headline': portfolio_content.get('headline', st.session_state.user_data.get('title', 'Professional')),
                 'about': portfolio_content.get('about', st.session_state.user_data.get('summary', 'Experienced professional')),
                 'skills': [],
                 'experience': [],
                 'education': [],
                 'projects': [],
-                'email': st.session_state.user_data.get('email'),
-                'phone': st.session_state.user_data.get('phone'),
-                'linkedin': st.session_state.user_data.get('linkedin'),
+                'email': st.session_state.user_data.get('email') or 'contact@email.com',
+                'phone': st.session_state.user_data.get('phone') or '+1-555-123-4567',
+                'linkedin': st.session_state.user_data.get('linkedin') or 'https://linkedin.com/in/professional',
                 'portfolio_style': settings.get('portfolio_style'),
                 'color_scheme': settings.get('color_scheme')
             }
@@ -884,7 +882,6 @@ def portfolio_page(groq_service, portfolio_gen):
             user_projects = st.session_state.user_data.get('projects', [])
             resume_projects = st.session_state.get('resume_projects', [])
             ai_projects = portfolio_content.get('projects', [])
-            
             all_projects = []
             
             if user_projects:
@@ -892,17 +889,34 @@ def portfolio_page(groq_service, portfolio_gen):
             
             if resume_projects:
                 all_projects.extend(resume_projects)
-            
             if settings.get('include_projects') and ai_projects:
                 all_projects.extend(ai_projects)
             
-            template_data['projects'] = all_projects
+            normalized_projects = []
+            for project in all_projects:
+                if isinstance(project, dict):
+                    normalized_project = {
+                        'title': project.get('title') or project.get('name') or 'Project',
+                        'technologies': project.get('technologies') or project.get('tech_stack') or project.get('skills') or 'Various Technologies',
+                        'duration': project.get('duration') or project.get('year') or 'Recent',
+                        'description': project.get('description') or project.get('summary') or 'Professional project showcasing technical skills'
+                    }
+                    normalized_projects.append(normalized_project)
+                else:
+                    normalized_projects.append({
+                        'title': str(project) if project else 'Project',
+                        'technologies': 'Various Technologies', 
+                        'duration': 'Recent',
+                        'description': 'Professional project showcasing technical skills'
+                    })
+            
+            template_data['projects'] = normalized_projects
             st.session_state.portfolio_template_data = template_data
             html_content = portfolio_gen.generate_html(template_data)
-            st.session_state.portfolio_html = html_content;
+            st.session_state.portfolio_html = html_content
             
             st.subheader("🌟 Portfolio Preview")
-            st.components.v1.html(f"<div style='max-width: 98vw; margin: 0 auto'>"+html_content+"</div>", height=900, scrolling=True, width='100%')
+            st.components.v1.html(f"<div style='max-width: 98vw; margin: 0 auto'>{html_content}</div>", height=900, scrolling=True)
             
             st.download_button(
                 label="📥 Download HTML",

@@ -200,7 +200,7 @@ class GroqLLM:
         Write a compelling, {tone.lower()} cover letter that demonstrates clear alignment between the candidate's background and the job requirements.
         
         🎯 TARGET ROLE: {company_name} - Position from job description
-          👤 CANDIDATE PROFILE:
+        👤 CANDIDATE PROFILE:
         Name: {user_data.get('name', 'Candidate Name Not Provided')}
         Current Title: {user_data.get('title') or 'Title Not Specified'}
         Location: {user_data.get('location') or 'Location Flexible'}
